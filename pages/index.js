@@ -62,7 +62,7 @@ export default function Home() {
     return (
       <div className={styles.loadingScreen}>
         <div className={styles.loadingContent}>
-          <div className={styles.loadingLogo}>OneData</div>
+          <div className={styles.loadingLogo}>UnifiedData</div>
           <div className={styles.loadingSpinner}></div>
         </div>
       </div>
@@ -73,14 +73,14 @@ export default function Home() {
     return (
       <div className={authStyles.welcomeContainer}>
         <Head>
-          <title>OneData - Your Data, Unified</title>
-          <meta name="description" content="OneData is a comprehensive data analysis, visualization, and management platform. Sign in to get started." />
+          <title>UnifiedData - Your Data, Unified</title>
+          <meta name="description" content="UnifiedData is a comprehensive data analysis, visualization, and management platform. Sign in to get started." />
         </Head>
         <div className={authStyles.welcomeCard}>
           <div className={authStyles.logoContainer}>
-            <div className={authStyles.logo}>OneData</div>
+            <div className={authStyles.logo}>UnifiedData</div>
           </div>
-          <h1 className={authStyles.welcomeTitle}>Welcome to OneData</h1>
+          <h1 className={authStyles.welcomeTitle}>Welcome to UnifiedData</h1>
           <p className={authStyles.welcomeSubtitle}>
             Your all-in-one platform for data analysis, visualization, and collaborative insights.
           </p>
@@ -118,11 +118,11 @@ export default function Home() {
   return (
     <div className={styles.container}>
       <Head>
-        <title>OneData - Your Spreadsheets</title>
+        <title>UnifiedData - Your Spreadsheets</title>
       </Head>
       
       <header className={styles.header}>
-        <h1 className={styles.logo}>OneData</h1>
+        <h1 className={styles.logo}>UnifiedData</h1>
         <nav className={styles.nav}>
           <button 
             className={`${styles.navButton} ${styles.active}`}

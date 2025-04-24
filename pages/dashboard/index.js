@@ -104,7 +104,7 @@ export default function Dashboards() {
   return (
     <div className={styles.container}>
       <Head>
-        <title>Dashboards - OneData</title>
+        <title>Dashboards - UnifiedData</title>
       </Head>
       
       <header className={styles.header}>
