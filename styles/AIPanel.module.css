@@ -1,0 +1,316 @@
+/* styles/AIPanel.module.css */
+.aiPanel {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    width: 100%;
+    background-color: white;
+    border-left: 1px solid #e0e0e0;
+    position: relative; /* For resizing */
+}
+
+.resizeHandle {
+    position: absolute;
+    left: -5px;
+    top: 0;
+    bottom: 0;
+    width: 10px;
+    cursor: ew-resize;
+    z-index: 10;
+}
+
+.aiPanelHeader {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 16px;
+    border-bottom: 1px solid #e0e0e0;
+    background-color: #f8f9fa;
+    flex-shrink: 0; /* Prevent header from shrinking */
+}
+
+.aiPanelHeader h3 {
+    margin: 0;
+    font-size: 18px;
+    font-weight: 500;
+    color: #202124;
+}
+
+.closeButton {
+    background: none;
+    border: none;
+    font-size: 22px;
+    color: #5f6368;
+    cursor: pointer;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+}
+
+.closeButton:hover {
+    background-color: rgba(95, 99, 104, 0.1);
+}
+
+.aiResponseArea {
+    flex: 1; /* Take up all available space */
+    overflow-y: auto; /* Enable scrolling */
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    background-color: #f5f5f5;
+}
+
+.aiResponseText {
+    background-color: white;
+    border-radius: 12px;
+    padding: 14px 16px;
+    color: #202124;
+    font-size: 15px;
+    line-height: 1.5;
+    white-space: pre-wrap;
+    max-width: 90%;
+    align-self: flex-start;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+    border-top-left-radius: 4px;
+}
+
+.aiInputArea {
+    padding: 12px 16px;
+    border-top: 1px solid #e0e0e0;
+    display: flex;
+    gap: 10px;
+    background-color: white;
+    flex-shrink: 0; /* Prevent input area from shrinking */
+}
+
+.aiInput {
+    flex: 1;
+    padding: 12px 16px;
+    border: 1px solid #dadce0;
+    border-radius: 24px;
+    resize: none;
+    max-height: 120px;
+    min-height: 24px;
+    font-family: inherit;
+    font-size: 15px;
+    line-height: 1.5;
+    overflow-y: auto;
+    background-color: white;
+}
+
+.aiInput:focus {
+    outline: none;
+    border-color: #4285f4;
+    box-shadow: 0 1px 2px rgba(66, 133, 244, 0.3);
+}
+
+.askButton {
+    background-color: #4285f4;
+    color: white;
+    border: none;
+    border-radius: 24px;
+    padding: 0 24px;
+    font-size: 15px;
+    font-weight: 500;
+    cursor: pointer;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+}
+
+.askButton:hover {
+    background-color: #3367d6;
+}
+
+/* Action prompt styling */
+.actionPrompt {
+    display: flex;
+    gap: 8px;
+    margin-top: 8px;
+    flex-wrap: wrap;
+}
+
+.confirmButton {
+    background-color: #4285f4;
+    color: white;
+    border: none;
+    border-radius: 18px;
+    padding: 8px 16px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+}
+
+.confirmButton:hover {
+    background-color: #3367d6;
+}
+
+.cancelButton {
+    background-color: #f5f5f5;
+    color: #5f6368;
+    border: 1px solid #dadce0;
+    border-radius: 18px;
+    padding: 7px 16px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+}
+
+.cancelButton:hover {
+    background-color: #eee;
+}
+
+/* Matrix operation UI */
+.matrixOperationUI {
+    background-color: white;
+    border-radius: 12px;
+    padding: 16px;
+    margin: 8px 0;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    border: 1px solid #e0e0e0;
+    font-size: 15px;
+}
+
+.matrixOperationUI p {
+    margin-top: 0;
+    margin-bottom: 12px;
+    color: #202124;
+}
+
+/* Matrix result styling */
+.matrixResult {
+    background-color: white;
+    border-radius: 12px;
+    padding: 16px;
+    margin: 12px 0;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    border: 1px solid #e0e0e0;
+    width: 100%;
+}
+
+.matrixResult h4 {
+    margin-top: 0;
+    margin-bottom: 16px;
+    color: #202124;
+    font-size: 16px;
+    font-weight: 500;
+}
+
+.matrixGrid {
+    display: inline-flex;
+    flex-direction: column;
+    border: 1px solid #dadce0;
+    border-radius: 8px;
+    padding: 8px;
+    background-color: #f8f9fa;
+    margin: 8px 0;
+}
+
+.matrixRow {
+    display: flex;
+}
+
+.matrixCell {
+    width: 56px;
+    height: 36px;
+    padding: 4px;
+    margin: 2px;
+    text-align: center;
+    border: 1px solid #e0e0e0;
+    border-radius: 4px;
+    background-color: white;
+    font-family: 'Roboto Mono', monospace;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    font-weight: 500;
+}
+
+.scalarResult {
+    font-size: 22px;
+    font-weight: 500;
+    color: #202124;
+    text-align: center;
+    padding: 20px;
+    font-family: 'Roboto Mono', monospace;
+    background-color: #f8f9fa;
+    border-radius: 8px;
+    border: 1px solid #dadce0;
+    margin: 12px 0;
+}
+
+.vectorResult {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 12px;
+    background-color: #f8f9fa;
+    border: 1px solid #dadce0;
+    border-radius: 8px;
+    font-family: 'Roboto Mono', monospace;
+    margin: 12px 0;
+}
+
+.vectorValue {
+    font-size: 15px;
+    color: #202124;
+    padding: 8px 12px;
+    background-color: white;
+    border-radius: 4px;
+    border: 1px solid #e0e0e0;
+}
+
+.resultSummary {
+    font-size: 14px;
+    color: #5f6368;
+    margin: 12px 0;
+}
+
+.resultActions {
+    display: flex;
+    gap: 10px;
+    margin-top: 16px;
+    flex-wrap: wrap;
+}
+
+.exportButton {
+    padding: 8px 16px;
+    background-color: #34a853;
+    color: white;
+    border: none;
+    border-radius: 18px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.exportButton:hover {
+    background-color: #2e8b47;
+}
+
+.newQueryButton {
+    padding: 8px 16px;
+    background-color: #4285f4;
+    color: white;
+    border: none;
+    border-radius: 18px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+}
+
+.newQueryButton:hover {
+    background-color: #3367d6;
+}

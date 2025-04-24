@@ -1,0 +1,117 @@
+/* styles/DataInspector.module.css */
+.inspector {
+    background-color: white;
+    border: 1px solid #e0e0e0;
+    border-radius: 4px;
+    padding: 16px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  }
+  
+  .inspector h3 {
+    margin-top: 0;
+    margin-bottom: 16px;
+    font-size: 16px;
+    color: #333;
+    border-bottom: 1px solid #eee;
+    padding-bottom: 8px;
+  }
+  
+  .statGrid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+  }
+  
+  .statItem {
+    display: flex;
+    flex-direction: column;
+    padding: 8px;
+    border-radius: 4px;
+    background-color: #f9f9f9;
+  }
+  
+  .statLabel {
+    font-size: 12px;
+    color: #666;
+    margin-bottom: 4px;
+  }
+  
+  .statValue {
+    font-size: 16px;
+    font-weight: 500;
+    color: #333;
+  }
+  
+  .emptyState {
+    color: #999;
+    font-style: italic;
+    text-align: center;
+    padding: 40px 0;
+  }
+  
+  .typeLabel {
+    display: inline-block;
+    padding: 4px 8px;
+    border-radius: 12px;
+    font-size: 12px;
+    color: #fff;
+    background-color: #4285f4;
+    margin-bottom: 16px;
+  }
+  
+  .typeNumber {
+    background-color: #e1f5fe;
+    color: #0277bd;
+  }
+  
+  .typeText {
+    background-color: #f1f8e9;
+    color: #558b2f;
+  }
+  
+  .typeDate {
+    background-color: #fff8e1;
+    color: #ff8f00;
+  }
+  
+  .typeBoolean {
+    background-color: #e8eaf6;
+    color: #3949ab;
+  }
+  
+  .histogram {
+    height: 120px;
+    margin-top: 16px;
+    display: flex;
+    align-items: flex-end;
+    border-bottom: 1px solid #ddd;
+    padding-top: 8px;
+  }
+  
+  .histogramBar {
+    flex: 1;
+    background-color: #4a90e2;
+    margin: 0 1px;
+    transition: height 0.3s;
+  }
+  
+  .quickActions {
+    display: flex;
+    margin-top: 16px;
+    gap: 8px;
+  }
+  
+  .quickActionButton {
+    background-color: transparent;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    padding: 4px 8px;
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  
+  .quickActionButton:hover {
+    background-color: #f0f0f0;
+    border-color: #aaa;
+  }

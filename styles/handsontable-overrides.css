@@ -1,0 +1,20 @@
+.handsontable-container {
+  z-index: 10 !important;
+}
+
+/* Override Handsontable dropdown z-index */
+.htDropdownMenu {
+  z-index: 5000 !important;
+}
+
+/* Override Handsontable context menu z-index */
+.htContextMenu {
+  z-index: 5000 !important;
+}
+
+/* Override other Handsontable overlays */
+.ht_clone_top, 
+.ht_clone_left, 
+.ht_clone_corner {
+  z-index: 20 !important;
+}

@@ -1,0 +1,9 @@
+fastapi>=0.95.0
+uvicorn>=0.21.1
+numpy>=1.24.2
+pydantic>=1.10.7
+pandas>=1.4.0
+scipy>=1.8.0
+statsmodels>=0.13.2
+scikit-learn>=1.0.2
+matplotlib>=3.5.1

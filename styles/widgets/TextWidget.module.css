@@ -1,0 +1,83 @@
+.textWidget {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.editor {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.toolbar {
+  display: flex;
+  padding: 8px 0;
+  gap: 8px;
+  border-bottom: 1px solid #e9ecef;
+}
+
+.alignmentControls,
+.fontSizeControls {
+  display: flex;
+  gap: 2px;
+}
+
+.toolbarButton {
+  background: none;
+  border: none;
+  padding: 4px 6px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.toolbarButton.active {
+  background-color: #e9ecef;
+}
+
+.toolbarButton:hover {
+  background-color: #f1f3f5;
+}
+
+.saveButton {
+  margin-left: auto;
+  background-color: #228be6;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  padding: 4px 8px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.saveButton:hover {
+  background-color: #1c7ed6;
+}
+
+.textEditor {
+  flex: 1;
+  padding: 8px;
+  border: none;
+  resize: none;
+  font-family: inherit;
+  font-size: inherit;
+  background-color: #f8f9fa;
+  border-radius: 4px;
+}
+
+.textEditor:focus {
+  outline: none;
+  background-color: #fff;
+  box-shadow: 0 0 0 2px rgba(34, 139, 230, 0.1);
+}
+
+.textContent {
+  height: 100%;
+  overflow-y: auto;
+  cursor: text;
+}
+
+.textContent p {
+  margin: 0 0 8px 0;
+}

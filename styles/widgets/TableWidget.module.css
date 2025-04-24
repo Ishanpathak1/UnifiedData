@@ -1,0 +1,127 @@
+.tableWidget {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    width: 100%;
+  }
+  
+  .tableControls {
+    display: flex;
+    margin-bottom: 12px;
+    gap: 8px;
+  }
+  
+  .searchInput {
+    flex: 1;
+    padding: 6px 10px;
+    border: 1px solid #ced4da;
+    border-radius: 4px;
+    font-size: 14px;
+  }
+  
+  .refreshButton {
+    background: none;
+    border: 1px solid #ced4da;
+    border-radius: 4px;
+    padding: 6px 10px;
+    cursor: pointer;
+  }
+  
+  .tableContainer {
+    flex: 1;
+    overflow: auto;
+    border: 1px solid #e9ecef;
+    border-radius: 4px;
+  }
+  
+  .table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+  
+  .tableHeader {
+    background-color: #f8f9fa;
+    font-weight: 500;
+    text-align: left;
+    padding: 8px 12px;
+    font-size: 13px;
+    color: #495057;
+    position: sticky;
+    top: 0;
+    border-bottom: 1px solid #e9ecef;
+  }
+  
+  .sortable {
+    cursor: pointer;
+  }
+  
+  .sortable:hover {
+    background-color: #e9ecef;
+  }
+  
+  .sorted {
+    background-color: #e9ecef;
+  }
+  
+  .sortIcon {
+    margin-left: 4px;
+  }
+  
+  .tableRow:nth-child(even) {
+    background-color: #f8f9fa;
+  }
+  
+  .tableRow:hover {
+    background-color: #e9ecef;
+  }
+  
+  .tableCell {
+    padding: 8px 12px;
+    border-bottom: 1px solid #e9ecef;
+    font-size: 13px;
+  }
+  
+  .loading,
+  .error,
+  .emptyState {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100px;
+    padding: 16px;
+    text-align: center;
+    color: #6c757d;
+    background-color: #f8f9fa;
+    border-radius: 4px;
+    margin: 8px 0;
+  }
+  
+  .error {
+    color: #dc3545;
+  }
+  
+  .pagination {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-top: 12px;
+    gap: 8px;
+  }
+  
+  .paginationButton {
+    background: none;
+    border: 1px solid #ced4da;
+    border-radius: 4px;
+    padding: 4px 8px;
+    cursor: pointer;
+  }
+  
+  .paginationButton:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+  
+  .pageInfo {
+    font-size: 13px;
+    color: #6c757d;
+  }

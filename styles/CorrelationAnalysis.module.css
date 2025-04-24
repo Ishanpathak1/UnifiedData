@@ -1,0 +1,278 @@
+.correlationPanel {
+  padding: 20px;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+}
+
+.instructions {
+  background-color: #f8f9fa;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 20px;
+}
+
+.correlationHelp {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid #e0e0e0;
+}
+
+.columnSelectors {
+  margin-bottom: 20px;
+}
+
+.columnSelector h3 {
+  margin-top: 0;
+  margin-bottom: 8px;
+  font-size: 16px;
+}
+
+.columnMultiSelect {
+  width: 100%;
+  height: 150px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  padding: 8px;
+}
+
+.selectionHint {
+  margin-top: 8px;
+  font-size: 14px;
+  color: #666;
+}
+
+.error {
+  background-color: #ffebee;
+  color: #c62828;
+  padding: 10px 16px;
+  border-radius: 4px;
+  margin-bottom: 16px;
+}
+
+.actions {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+.runButton {
+  background-color: #1976d2;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  padding: 10px 16px;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.runButton:hover {
+  background-color: #1565c0;
+}
+
+.runButton:disabled {
+  background-color: #bbdefb;
+  cursor: not-allowed;
+}
+
+.cancelButton {
+  background-color: #f5f5f5;
+  color: #333;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  padding: 10px 16px;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.cancelButton:hover {
+  background-color: #e0e0e0;
+}
+
+.correlationResult {
+  background-color: #f8f9fa;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  padding: 16px;
+}
+
+.correlationTable {
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+  overflow: hidden;
+  margin-bottom: 16px;
+  background-color: white;
+}
+
+.tableHeader {
+  display: flex;
+  background-color: #f5f5f5;
+}
+
+.cornerCell {
+  width: 120px;
+  padding: 10px;
+  font-weight: bold;
+  border-right: 1px solid #e0e0e0;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.headerCell {
+  width: 100px;
+  padding: 10px;
+  font-weight: bold;
+  text-align: center;
+  border-right: 1px solid #e0e0e0;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.tableRow {
+  display: flex;
+}
+
+.rowHeader {
+  width: 120px;
+  padding: 10px;
+  font-weight: bold;
+  background-color: #f5f5f5;
+  border-right: 1px solid #e0e0e0;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.correlationCell {
+  width: 100px;
+  padding: 10px;
+  text-align: center;
+  border-right: 1px solid #e0e0e0;
+  border-bottom: 1px solid #e0e0e0;
+  position: relative;
+  transition: all 0.2s ease;
+}
+
+.correlationCell:hover {
+  transform: scale(1.05);
+  z-index: 1;
+  box-shadow: 0 0 5px rgba(0,0,0,0.2);
+}
+
+.correlationLegend {
+  background-color: white;
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+  padding: 12px;
+}
+
+.significanceIndicator {
+  position: absolute;
+  top: 2px;
+  right: 4px;
+  font-size: 12px;
+  font-weight: bold;
+}
+
+.downloadButtons {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 15px;
+}
+
+.downloadButton {
+  background-color: #4caf50;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  padding: 8px 12px;
+  font-size: 14px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+}
+
+.downloadButton:hover {
+  background-color: #388e3c;
+}
+
+.scatterPlotContainer {
+  margin-top: 20px;
+  padding: 15px;
+  background-color: white;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+}
+
+.canvasContainer {
+  height: 300px;
+  margin-top: 10px;
+}
+
+.insightsSection {
+  margin-top: 20px;
+  padding: 15px;
+  background-color: #e8f5e9;
+  border: 1px solid #c8e6c9;
+  border-radius: 8px;
+}
+
+.insightsSection h3 {
+  margin-top: 0;
+  color: #2e7d32;
+}
+
+.insightsSection ul {
+  margin: 0;
+  padding-left: 20px;
+}
+
+.insightsSection li {
+  margin-bottom: 5px;
+}
+
+.methodSelector {
+  margin-bottom: 15px;
+  padding: 10px;
+  background-color: #f5f5f5;
+  border-radius: 4px;
+}
+
+.methodSelect {
+  margin: 0 10px;
+  padding: 5px;
+  border-radius: 4px;
+  border: 1px solid #ccc;
+}
+
+.methodInfo {
+  margin-top: 5px;
+  font-size: 14px;
+  color: #666;
+  font-style: italic;
+}
+
+.resultHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 15px;
+}
+
+.viewToggleButton {
+  background-color: #673ab7;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  padding: 8px 12px;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.viewToggleButton:hover {
+  background-color: #5e35b1;
+}
+
+.heatmapContainer {
+  height: 400px;
+  background-color: white;
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+  padding: 15px;
+  margin-bottom: 20px;
+} 

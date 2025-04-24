@@ -1,0 +1,902 @@
+/* styles/Spreadsheet.module.css */
+.container {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    background-color: white;
+    font-family: 'Arial', sans-serif;
+  }
+  
+  .header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.75rem 1.5rem;
+    background-color: white;
+    border-bottom: 1px solid #E5E7EB;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  }
+  
+  .headerLeft {
+    display: flex;
+    align-items: center;
+  }
+  
+  .logo {
+    font-size: 1.5rem;
+    color: #4F46E5;
+    margin-right: 1rem;
+  }
+  
+  .titleArea {
+    display: flex;
+    flex-direction: column;
+  }
+  
+  .titleInput {
+    border: 1px solid transparent;
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: #111827;
+    padding: 0.25rem 0.5rem;
+    border-radius: 0.25rem;
+    background-color: transparent;
+    width: 300px;
+    transition: all 0.2s;
+  }
+  
+  .titleInput:hover {
+    border-color: #E5E7EB;
+    background-color: #F9FAFB;
+  }
+  
+  .titleInput:focus {
+    outline: none;
+    border-color: #4F46E5;
+    background-color: #F9FAFB;
+  }
+  
+  .subtitle {
+    font-size: 0.75rem;
+    color: #6B7280;
+    display: flex;
+    align-items: center;
+  }
+  
+  .separator {
+    margin: 0 0.5rem;
+  }
+  
+  .headerRight {
+    display: flex;
+    align-items: center;
+  }
+  
+  .aiButton, .saveButton {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    border: none;
+    border-radius: 0.375rem;
+    padding: 0.5rem 1rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  
+  .aiButton {
+    background-color: #F9FAFB;
+    color: #4B5563;
+    border: 1px solid #E5E7EB;
+  }
+  
+  .aiButton:hover {
+    background-color: #F3F4F6;
+  }
+  
+  .aiButton.active {
+    background-color: #EEF2FF;
+    color: #4F46E5;
+    border-color: #C7D2FE;
+  }
+  
+  .saveButton {
+    background-color: #4F46E5;
+    color: white;
+  }
+  
+  .saveButton:hover {
+    background-color: #4338CA;
+  }
+  
+  .saveButton:disabled {
+    opacity: 0.7;
+    cursor: not-allowed;
+  }
+  
+  .saveIcon {
+    width: 1rem;
+    height: 1rem;
+  }
+  
+  .buttonSpinner {
+    width: 1rem;
+    height: 1rem;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    border-top: 2px solid white;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+  }
+  
+  .menuBar {
+    display: flex;
+    background-color: #F9FAFB;
+    border-bottom: 1px solid #E5E7EB;
+    padding: 0 1rem;
+  }
+  
+  .menuItem {
+    padding: 0.625rem 0.875rem;
+    font-size: 0.875rem;
+    background: none;
+    border: none;
+    color: #4B5563;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  
+  .menuItem:hover {
+    background-color: #F3F4F6;
+    color: #111827;
+  }
+  
+  .menuItem.active {
+    color: #4F46E5;
+    border-bottom: 2px solid #4F46E5;
+  }
+  
+  .toolbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.5rem 1rem;
+    background-color: white;
+    border-bottom: 1px solid #E5E7EB;
+  }
+  
+  .toolbarGroup {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+  
+  .toolbarButton {
+    background-color: white;
+    border: 1px solid #E5E7EB;
+    color: #4B5563;
+    padding: 0.375rem 0.75rem;
+    border-radius: 0.375rem;
+    font-size: 0.875rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+  }
+  
+  .toolbarButton:hover {
+    background-color: #F9FAFB;
+    border-color: #D1D5DB;
+    color: #111827;
+  }
+  
+  .toolbarSelect {
+    padding: 0.375rem 0.75rem;
+    border-radius: 0.375rem;
+    border: 1px solid #E5E7EB;
+    font-size: 0.875rem;
+    color: #4B5563;
+    background-color: white;
+    cursor: pointer;
+  }
+  
+  .contentArea {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    background-color: white;
+    overflow: hidden;
+  }
+  
+  .contentWrapper {
+    display: flex;
+    flex: 1;
+    width: 100%;
+    height: 100%;
+    position: relative;
+  }
+  
+  .mainContentLayout {
+    display: flex;
+    height: 100%;
+    position: relative;
+    transition: width 0.2s ease-out;
+  }
+  
+  .spreadsheetContainer {
+    flex: 1;
+    min-width: 0;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  
+  .formulaBar {
+    display: flex;
+    align-items: center;
+    padding: 0.5rem 1rem;
+    border-bottom: 1px solid #E5E7EB;
+    background-color: white;
+  }
+  
+  .cellReference {
+    font-size: 0.875rem;
+    color: #4B5563;
+    font-weight: 500;
+    width: 3rem;
+    text-align: center;
+    flex-shrink: 0;
+  }
+  
+  .formulaInput {
+    flex: 1;
+    padding: 0.375rem 0.75rem;
+    border: 1px solid #E5E7EB;
+    border-radius: 0.375rem;
+    font-size: 0.875rem;
+    color: #111827;
+    background-color: #F9FAFB;
+  }
+  
+  .formulaInput:focus {
+    outline: none;
+    border-color: #4F46E5;
+    background-color: white;
+  }
+  
+  .aiPanelContainer {
+    height: 100%;
+    position: relative;
+    box-shadow: -2px 0 5px rgba(0, 0, 0, 0.1);
+    min-width: 320px;
+    flex-shrink: 0;
+    z-index: 5;
+    background-color: white;
+    border-left: 1px solid #e0e0e0;
+  }
+  
+  .resizeHandle {
+    position: absolute;
+    left: 0;
+    top: 0;
+    height: 100%;
+    width: 6px;
+    cursor: ew-resize;
+    z-index: 10;
+  }
+  
+  .resizeHandle:hover,
+  .resizeHandle:active {
+    background-color: rgba(0, 0, 0, 0.05);
+  }
+  
+  .modalOverlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+  }
+  
+  .chartModal, .templatesModal {
+    background-color: white;
+    border-radius: 0.75rem;
+    width: 90%;
+    max-width: 800px;
+    max-height: 90vh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  }
+  
+  .modalHeader {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem 1.5rem;
+    border-bottom: 1px solid #E5E7EB;
+  }
+  
+  .modalHeader h3 {
+    margin: 0;
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: #111827;
+  }
+  
+  .closeButton {
+    background: none;
+    border: none;
+    font-size: 1.5rem;
+    line-height: 1;
+    color: #6B7280;
+    cursor: pointer;
+    transition: color 0.2s;
+  }
+  
+  .closeButton:hover {
+    color: #111827;
+  }
+  
+  .chartContainer {
+    padding: 1.5rem;
+    flex: 1;
+    overflow: auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  
+  .modalFooter {
+    padding: 1rem 1.5rem;
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.75rem;
+    border-top: 1px solid #E5E7EB;
+    background-color: #F9FAFB;
+  }
+  
+  .exportButton, .closeModalButton {
+    padding: 0.5rem 1rem;
+    border-radius: 0.375rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  
+  .exportButton {
+    background-color: #4F46E5;
+    color: white;
+    border: none;
+  }
+  
+  .exportButton:hover {
+    background-color: #4338CA;
+  }
+  
+  .closeModalButton {
+    background-color: white;
+    color: #4B5563;
+    border: 1px solid #E5E7EB;
+  }
+  
+  .closeModalButton:hover {
+    background-color: #F9FAFB;
+    color: #111827;
+  }
+  
+  .dataInspectorContainer {
+    width: 320px;
+    height: 100%;
+    overflow-y: auto;
+    padding: 0 0 0 16px;
+    flex-shrink: 0;
+  }
+  
+  .advancedMenu {
+    position: absolute;
+    background-color: white;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    z-index: 100;
+    padding: 8px 0;
+    min-width: 200px;
+    margin-top: 36px;
+    right: 10px;
+  }
+  
+  .advancedMenuItem {
+    display: block;
+    width: 100%;
+    text-align: left;
+    padding: 8px 16px;
+    background: none;
+    border: none;
+    cursor: pointer;
+  }
+  
+  .advancedMenuItem:hover {
+    background-color: #f5f5f5;
+  }
+  
+  .advancedPanelContainer {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 80%;
+    max-width: 900px;
+    height: 80vh;
+    background-color: white;
+    border-radius: 8px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+    z-index: 1000;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  
+  .advancedPanelHeader {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px;
+    border-bottom: 1px solid #e0e0e0;
+  }
+  
+  .advancedPanelHeader h2 {
+    margin: 0;
+    font-size: 20px;
+    color: #202124;
+  }
+  
+  .advancedPanelContent {
+    flex: 1;
+    overflow: auto;
+    padding: 0;
+    position: relative;
+  }
+  
+  .templateGrid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 1rem;
+    padding: 1.5rem;
+    overflow: auto;
+    max-height: 70vh;
+  }
+  
+  .templateCard {
+    background-color: white;
+    border: 1px solid #E5E7EB;
+    border-radius: 0.5rem;
+    padding: 1rem;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  
+  .templateCard:hover {
+    border-color: #C7D2FE;
+    background-color: #F5F7FF;
+    transform: translateY(-2px);
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+  }
+  
+  .templateCard h4 {
+    margin: 0 0 0.5rem 0;
+    font-size: 1rem;
+    font-weight: 600;
+    color: #111827;
+  }
+  
+  .templateCard p {
+    margin: 0;
+    font-size: 0.875rem;
+    color: #6B7280;
+  }
+  
+  .statisticalTools {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    padding: 16px;
+  }
+  
+  .statsHeader {
+    margin-bottom: 20px;
+  }
+  
+  .statsHeader h3 {
+    margin: 0 0 8px 0;
+    font-size: 18px;
+    color: #202124;
+  }
+  
+  .statsHeader p {
+    margin: 0;
+    color: #5f6368;
+    font-size: 14px;
+  }
+  
+  .analysisOptions {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  
+  .analysisButton {
+    background-color: #f1f3f4;
+    border: 1px solid #dadce0;
+    border-radius: 4px;
+    padding: 12px 16px;
+    text-align: left;
+    font-size: 14px;
+    cursor: pointer;
+    transition: background-color 0.2s;
+  }
+  
+  .analysisButton:hover {
+    background-color: #e8eaed;
+  }
+  
+  .menuItemWithDropdown {
+    position: relative;
+    display: inline-block;
+  }
+  
+  .dropdownMenu {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    background-color: white;
+    border: 1px solid #dadce0;
+    border-radius: 4px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    min-width: 220px;
+    z-index: 1000;
+  }
+  
+  .dropdownItem {
+    display: block;
+    width: 100%;
+    padding: 10px 16px;
+    text-align: left;
+    border: none;
+    background: none;
+    font-size: 14px;
+    color: #202124;
+    cursor: pointer;
+  }
+  
+  .dropdownItem:hover {
+    background-color: #f1f3f4;
+  }
+  
+  .dropdownDivider {
+    height: 1px;
+    background-color: #dadce0;
+    margin: 4px 0;
+  }
+  
+  .backButton {
+    position: fixed;
+    bottom: 1.5rem;
+    left: 1.5rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    background-color: white;
+    border: 1px solid #E5E7EB;
+    color: #4B5563;
+    padding: 0.625rem 1rem;
+    border-radius: 0.5rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    cursor: pointer;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    transition: all 0.2s;
+    z-index: 100;
+  }
+  
+  .backButton:hover {
+    background-color: #F9FAFB;
+    box-shadow: 0 3px 6px rgba(0, 0, 0, 0.1);
+    transform: translateY(-1px);
+  }
+  
+  @keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+  }
+
+  .dashboardModal {
+    background-color: white;
+    border-radius: 0.75rem;
+    width: 90%;
+    max-width: 600px;
+    max-height: 90vh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  }
+
+  .dashboardModalContent {
+    padding: 1.5rem;
+    overflow-y: auto;
+    flex: 1;
+  }
+
+  .dashboardButton {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    background-color: #4F46E5;
+    color: white;
+    border: none;
+    padding: 0.5rem 1rem;
+    border-radius: 0.375rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .dashboardButton:hover {
+    background-color: #4338CA;
+  }
+
+  .dashboardIcon {
+    width: 1rem;
+    height: 1rem;
+  }
+
+  .menuButton {
+    background: none;
+    border: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 2rem;
+    height: 2rem;
+    border-radius: 0.375rem;
+    color: #6B7280;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .menuButton:hover {
+    background-color: #F3F4F6;
+    color: #111827;
+  }
+
+  .modalActions {
+    display: flex;
+    align-items: center;
+    position: relative;
+  }
+
+  .chartMenu {
+    position: absolute;
+    top: 100%;
+    right: 0;
+    margin-top: 0.5rem;
+    background-color: white;
+    border: 1px solid #E5E7EB;
+    border-radius: 0.5rem;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    overflow: hidden;
+    z-index: 10;
+    min-width: 12rem;
+  }
+
+  .chartMenuItem {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.75rem 1rem;
+    width: 100%;
+    border: none;
+    background: none;
+    text-align: left;
+    color: #4B5563;
+    font-size: 0.875rem;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .chartMenuItem:hover {
+    background-color: #F9FAFB;
+    color: #111827;
+  }
+
+  .dashboardsList {
+    margin-bottom: 1.5rem;
+  }
+
+  .dashboardsList h4 {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: #4B5563;
+    margin: 0 0 0.75rem 0;
+  }
+
+  .dashboardsGrid {
+    display: grid;
+    grid-template-columns: repeat(1, 1fr);
+    gap: 0.75rem;
+    max-height: 15rem;
+    overflow-y: auto;
+    padding: 0.25rem;
+  }
+
+  .dashboardCard {
+    display: flex;
+    align-items: center;
+    padding: 0.75rem;
+    border: 1px solid #E5E7EB;
+    border-radius: 0.5rem;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .dashboardCard:hover {
+    border-color: #C7D2FE;
+    background-color: #F5F7FF;
+  }
+
+  .dashboardCard .dashboardIcon {
+    width: 2.5rem;
+    height: 2.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 0.375rem;
+    background-color: #F3F4F6;
+    color: #4F46E5;
+    margin-right: 0.75rem;
+  }
+
+  .dashboardCard .dashboardIcon svg {
+    width: 1.25rem;
+    height: 1.25rem;
+  }
+
+  .dashboardInfo h5 {
+    margin: 0 0 0.25rem 0;
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: #111827;
+  }
+
+  .dashboardInfo p {
+    margin: 0;
+    font-size: 0.75rem;
+    color: #6B7280;
+  }
+
+  .emptyDashboardState {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 2rem 0;
+    text-align: center;
+  }
+
+  .emptyStateIcon {
+    width: 3rem;
+    height: 3rem;
+    color: #9CA3AF;
+    margin-bottom: 1rem;
+  }
+
+  .emptyDashboardState h4 {
+    margin: 0 0 0.5rem 0;
+    font-size: 1rem;
+    font-weight: 500;
+    color: #111827;
+  }
+
+  .emptyDashboardState p {
+    margin: 0;
+    font-size: 0.875rem;
+    color: #6B7280;
+  }
+
+  .createDashboardSection {
+    margin-top: 1.5rem;
+    border-top: 1px solid #E5E7EB;
+    padding-top: 1.5rem;
+  }
+
+  .createDashboardSection h4 {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: #4B5563;
+    margin: 0 0 0.75rem 0;
+  }
+
+  .createDashboardForm {
+    display: flex;
+    gap: 0.75rem;
+  }
+
+  .dashboardInput {
+    flex: 1;
+    padding: 0.5rem 0.75rem;
+    font-size: 0.875rem;
+    border: 1px solid #E5E7EB;
+    border-radius: 0.375rem;
+    color: #111827;
+  }
+
+  .dashboardInput:focus {
+    outline: none;
+    border-color: #4F46E5;
+    box-shadow: 0 0 0 1px #4F46E5;
+  }
+
+  .createDashboardButton {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    background-color: #4F46E5;
+    color: white;
+    border: none;
+    padding: 0.5rem 1rem;
+    border-radius: 0.375rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .createDashboardButton:hover:not(:disabled) {
+    background-color: #4338CA;
+  }
+
+  .createDashboardButton:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  .fileDropdownItem {
+    display: flex;
+    padding: 10px 16px;
+    width: 100%;
+    cursor: pointer;
+    background: none;
+    border: none;
+    text-align: left;
+    font-size: 14px;
+    color: #202124;
+  }
+
+  .fileDropdownItem:hover {
+    background-color: #f1f3f4;
+  }
+
+  .fileDropdownItem label {
+    display: block;
+    width: 100%;
+    height: 100%;
+    cursor: pointer;
+  }
+
+  .fileInput {
+    display: none;
+  }
