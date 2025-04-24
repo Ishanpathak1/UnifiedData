@@ -1,6 +1,4 @@
-# UnifiedData - Advanced Data Analysis Spreadsheet Application
-
-
+# UnifiedData - Advanced Data Analysis Spreadsheet Applicatio
 
 ## Overview
 
@@ -67,7 +65,13 @@ UnifiedData is a modern web-based spreadsheet application with advanced data ana
 ### Dashboard Functionality
 - **Interactive Dashboards**: Create custom dashboards with multiple visualizations
 - **Live Data Connection**: Dashboards update automatically when source data changes
-
+- **Drag-and-Drop Interface**: Easily resize and reposition dashboard elements
+- **Sharing Options**: Share dashboards with team members
+- **Multiple Widget Types**: 
+  - Table widgets for displaying data in tabular format
+  - KPI widgets for highlighting key metrics
+  - Text widgets for adding commentary and context
+  - iFrame widgets for embedding external content
 
 ### AI Integration
 - **Data Analysis Assistant**: Ask questions about your data in natural language
