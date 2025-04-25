@@ -1493,7 +1493,13 @@ export default function Home() {
       {/* Header */}
       <header className={styles.header}>
         <div className={styles.headerLeft}>
-          <div className={styles.logo}>📊</div>
+        <div 
+          className={styles.logo} 
+          onClick={() => router.push('/')}
+          style={{ cursor: 'pointer' }}
+                                        >
+                                        📊
+                                </div>
           <div className={styles.titleArea}>
             <input 
               type="text" 
