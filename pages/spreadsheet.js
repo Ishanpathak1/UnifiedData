@@ -157,41 +157,62 @@ export default function Home() {
   const [dashboards, setDashboards] = useState([]);
   const [newDashboardTitle, setNewDashboardTitle] = useState('');
   const [isCreatingDashboard, setIsCreatingDashboard] = useState(false);
+  const [sheets, setSheets] = useState([{ id: 'default', name: 'Main Sheet', data }]);
+  const [activeSheetId, setActiveSheetId] = useState('default');
 
   // Import file handler
   const handleFileImport = (file) => {
     const reader = new FileReader();
-    
-    // Get file extension
     const fileExtension = file.name.split('.').pop().toLowerCase();
     
     reader.onload = (e) => {
       const content = e.target.result;
       
-      // Handle different file types
       if (fileExtension === 'csv') {
-        // Parse CSV
         Papa.parse(content, {
           complete: (results) => {
-            // Update spreadsheet data
-            if (hotRef.current) {
-              hotRef.current.hotInstance.loadData(results.data);
-              setData(results.data);
+            if (results.data && results.data.length) {
+              // Create a new sheet for CSV data
+              const newSheet = {
+                id: `sheet_${Date.now()}`,
+                name: file.name.split('.')[0],
+                data: results.data
+              };
+              
+              setSheets(prev => [...prev, newSheet]);
+              setActiveSheetId(newSheet.id);
+              
+              if (hotRef.current) {
+                hotRef.current.hotInstance.loadData(results.data);
+                setData(results.data);
+              }
             }
           },
           header: false
         });
       } else if (['xlsx', 'xls'].includes(fileExtension)) {
-        // Parse Excel file
         const workbook = XLSX.read(content, { type: 'binary' });
-        const sheetName = workbook.SheetNames[0];
-        const worksheet = workbook.Sheets[sheetName];
-        const excelData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+        const newSheets = [];
         
-        // Update spreadsheet data
-        if (hotRef.current) {
-          hotRef.current.hotInstance.loadData(excelData);
-          setData(excelData);
+        workbook.SheetNames.forEach((sheetName, index) => {
+          const worksheet = workbook.Sheets[sheetName];
+          const excelData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+          
+          newSheets.push({
+            id: `sheet_${Date.now()}_${index}`,
+            name: sheetName,
+            data: excelData
+          });
+        });
+        
+        if (newSheets.length > 0) {
+          setSheets(prev => [...prev, ...newSheets]);
+          setActiveSheetId(newSheets[0].id);
+          
+          if (hotRef.current) {
+            hotRef.current.hotInstance.loadData(newSheets[0].data);
+            setData(newSheets[0].data);
+          }
         }
       }
     };
@@ -578,117 +599,50 @@ export default function Home() {
 
   // Add this function to save the spreadsheet
   const saveSpreadsheet = async () => {
-    if (!user) {
-      toast.error("Please sign in to save your work");
-      return;
-    }
+    if (!user || !hotRef.current) return;
+    
+    // Update current sheet with latest data
+    const currentData = hotRef.current.hotInstance.getData();
+    const updatedSheets = sheets.map(sheet => 
+      sheet.id === activeSheetId ? {...sheet, data: currentData} : sheet
+    );
+    setSheets(updatedSheets);
     
     setIsSaving(true);
     
     try {
-      console.log("Starting save operation...");
+      // Use current spreadsheet ID or one from URL
+      const docId = spreadsheetId || router.query.id;
       
-      // Get current data from the spreadsheet
-      const currentData = hotRef.current ? hotRef.current.hotInstance.getData() : data;
-      
-      // Serialize the data for Firestore
+      // Create serialized data for Firestore
       const serializedData = {
-        rows: currentData.map((row, rowIndex) => ({
-          rowId: rowIndex.toString(),
-          cells: row.map((cell, colIndex) => ({
-            colId: colIndex.toString(),
-            value: cell === null ? '' : cell // Handle null values
-          }))
-        }))
-      };
-      
-      // Create the spreadsheet object
-      const spreadsheetData = {
         title: documentTitle,
-        serializedData: serializedData,
+        sheets: sanitizeForFirestore(updatedSheets),
         lastModified: serverTimestamp(),
         ownerId: user.uid,
+        ownerEmail: user.email,
+        ownerName: user.displayName || 'Unknown User'
       };
       
-      console.log("User ID:", user.uid);
-      
-      // Get the ID from URL or current state
-      let docId = spreadsheetId;
-      const urlId = router.query.id;
-      
-      // If the URL has an ID and it's not 'new', use that
-      if (urlId && urlId !== 'new') {
-        docId = urlId;
-        console.log("Using ID from URL:", docId);
-      }
-      
-      // If this is a new spreadsheet, create a new document
-      if (!docId) {
-        console.log("Creating new spreadsheet...");
-        // Create a new document with auto-generated ID
-        const docRef = doc(collection(db, 'spreadsheets'));
-        docId = docRef.id;
-        
-        // Also add creation timestamp for new documents
-        spreadsheetData.createdAt = serverTimestamp();
-        
-        console.log("Setting doc at path:", `spreadsheets/${docId}`);
-        await setDoc(docRef, spreadsheetData);
-        
+      if (docId && docId !== 'new') {
+        await updateDoc(doc(db, 'spreadsheets', docId), serializedData);
         setSpreadsheetId(docId);
-        
-        // Update URL without page reload
-        window.history.replaceState(
-          {}, 
-          documentTitle, 
-          `/spreadsheet?id=${docId}`
-        );
-        
-        console.log("Created new spreadsheet with ID:", docId);
       } else {
-        console.log("Updating existing spreadsheet:", docId);
-        const docRef = doc(db, 'spreadsheets', docId);
-        console.log("Document reference:", docRef.path);
+        const newDocRef = doc(collection(db, 'spreadsheets'));
+        await setDoc(newDocRef, {
+          ...serializedData,
+          createdAt: serverTimestamp()
+        });
         
-        // First check if the document exists
-        const docSnap = await getDoc(docRef);
-        if (docSnap.exists()) {
-          console.log("Document exists, updating...");
-          // Update existing document
-          await setDoc(docRef, spreadsheetData, { merge: true });
-        } else {
-          console.log("Document doesn't exist, creating new document with specified ID");
-          // Create new document with specified ID
-          spreadsheetData.createdAt = serverTimestamp();
-          await setDoc(docRef, spreadsheetData);
-        }
+        setSpreadsheetId(newDocRef.id);
+        router.push(`/spreadsheet?id=${newDocRef.id}`, undefined, { shallow: true });
       }
       
-      // Update last saved time
       setLastSaved(new Date());
-      
-      // Success message
-      toast.success("Spreadsheet saved successfully");
-      console.log("Save complete");
-      
-      // Now that we've saved, update any dependent dashboards
-      updateDependentDashboards();
+      toast.success('Spreadsheet saved successfully');
     } catch (error) {
-      console.error("Error saving spreadsheet:", error);
-      
-      // More detailed error information
-      if (error.code) {
-        console.error("Error code:", error.code);
-      }
-      
-      // Provide more helpful messages based on error type
-      if (error.message.includes("Missing or insufficient permissions")) {
-        toast.error("Permission denied: Please sign in again or check your account permissions");
-      } else if (error.message.includes("network error")) {
-        toast.error("Network error: Please check your internet connection");
-      } else {
-        toast.error(`Failed to save: ${error.message}`);
-      }
+      console.error('Error saving spreadsheet:', error);
+      toast.error('Failed to save spreadsheet');
     } finally {
       setIsSaving(false);
     }
@@ -715,56 +669,42 @@ export default function Home() {
       if (docSnap.exists()) {
         const sheetData = docSnap.data();
         
-        // Make sure to set spreadsheetId
         setSpreadsheetId(id);
         
-        // Check if current user has access
         if (sheetData.ownerId === user.uid) {
-          // Deserialize the data from Firestore format back to array format
-          if (sheetData.serializedData && sheetData.serializedData.rows) {
-            // Create an empty 2D array with the right dimensions
-            const maxRowId = Math.max(...sheetData.serializedData.rows.map(r => parseInt(r.rowId))) + 1;
-            const maxColId = Math.max(...sheetData.serializedData.rows.flatMap(r => 
-              r.cells.map(c => parseInt(c.colId))
-            )) + 1;
-            
-            const deserializedData = Array(maxRowId).fill().map(() => Array(maxColId).fill(''));
-            
-            // Fill in the data
-            sheetData.serializedData.rows.forEach(row => {
-              const rowIndex = parseInt(row.rowId);
-              row.cells.forEach(cell => {
-                const colIndex = parseInt(cell.colId);
-                deserializedData[rowIndex][colIndex] = cell.value;
-              });
-            });
-            
-            // Set the data
-            setData(deserializedData);
-            if (hotRef.current) {
-              hotRef.current.hotInstance.loadData(deserializedData);
-            }
-          }
-          
           if (sheetData.title) {
             setDocumentTitle(sheetData.title);
           }
           
-          // Set last saved time if available
+          // Load sheets data
+          if (sheetData.sheets && Array.isArray(sheetData.sheets)) {
+            setSheets(sheetData.sheets);
+            
+            // Set first sheet as active and load it
+            if (sheetData.sheets.length > 0) {
+              const firstSheet = sheetData.sheets[0];
+              setActiveSheetId(firstSheet.id);
+              
+              if (hotRef.current && firstSheet.data) {
+                hotRef.current.hotInstance.loadData(firstSheet.data);
+                setData(firstSheet.data);
+              }
+            }
+          }
+          
           if (sheetData.lastModified) {
             setLastSaved(sheetData.lastModified.toDate());
           }
         } else {
-          alert("You don't have permission to access this spreadsheet");
+          toast.error("You don't have permission to access this spreadsheet");
           router.push('/');
         }
       } else {
-        alert("Spreadsheet not found");
-        router.push('/');
+        toast.error('Spreadsheet not found');
       }
     } catch (error) {
-      console.error("Error loading spreadsheet:", error);
-      alert("Failed to load spreadsheet: " + error.message);
+      console.error('Error loading spreadsheet:', error);
+      toast.error('Failed to load spreadsheet');
     }
   };
 
@@ -1457,6 +1397,97 @@ export default function Home() {
     handleFileImport(file);
   };
 
+  // Add this component function inside your spreadsheet.js file but outside your main component
+  const SheetTabs = ({ sheets, activeSheetId, onChangeSheet, onAddSheet }) => {
+    return (
+      <div style={{
+        display: 'flex',
+        padding: '4px 8px',
+        backgroundColor: '#f5f5f5',
+        borderTop: '1px solid #ddd'
+      }}>
+        <div style={{ display: 'flex', overflow: 'auto', flex: 1 }}>
+          {sheets.map(sheet => (
+            <div 
+              key={sheet.id}
+              onClick={() => onChangeSheet(sheet.id)}
+              style={{
+                padding: '8px 16px',
+                borderRight: '1px solid #ddd',
+                borderBottom: sheet.id === activeSheetId ? '2px solid #4F46E5' : '2px solid transparent',
+                backgroundColor: sheet.id === activeSheetId ? 'white' : 'transparent',
+                cursor: 'pointer',
+                fontWeight: sheet.id === activeSheetId ? '500' : 'normal'
+              }}
+            >
+              {sheet.name}
+            </div>
+          ))}
+        </div>
+        <button
+          onClick={onAddSheet}
+          style={{
+            marginLeft: '8px',
+            padding: '4px 12px',
+            backgroundColor: '#4F46E5',
+            color: 'white',
+            border: 'none',
+            borderRadius: '4px',
+            cursor: 'pointer'
+          }}
+        >
+          + Add Sheet
+        </button>
+      </div>
+    );
+  };
+
+  // Add these functions to your main component
+  const addSheet = () => {
+    const newSheet = {
+      id: `sheet_${Date.now()}`,
+      name: `Sheet ${sheets.length + 1}`,
+      data: [['', '', '', ''], ['', '', '', '']]
+    };
+    setSheets([...sheets, newSheet]);
+    setActiveSheetId(newSheet.id);
+    
+    // Load empty data into the spreadsheet
+    if (hotRef.current) {
+      hotRef.current.hotInstance.loadData(newSheet.data);
+      setData(newSheet.data);
+    }
+  };
+  
+  const handleSheetChange = (sheetId) => {
+    // First save current sheet data
+    if (hotRef.current) {
+      const currentData = hotRef.current.hotInstance.getData();
+      setSheets(prevSheets => prevSheets.map(sheet => 
+        sheet.id === activeSheetId ? {...sheet, data: currentData} : sheet
+      ));
+    }
+    
+    // Switch to new sheet
+    setActiveSheetId(sheetId);
+    
+    // Load new sheet data
+    const selectedSheet = sheets.find(sheet => sheet.id === sheetId);
+    if (selectedSheet && hotRef.current) {
+      hotRef.current.hotInstance.loadData(selectedSheet.data);
+      setData(selectedSheet.data);
+    }
+  };
+
+  // Add this useEffect
+  useEffect(() => {
+    // Initialize sheets with data if not already done
+    if (sheets.length === 0 && data.length > 0) {
+      setSheets([{ id: 'default', name: 'Main Sheet', data }]);
+      setActiveSheetId('default');
+    }
+  }, [data]);
+
   return (
     <div className={styles.container}>
       {/* Header */}
@@ -1911,7 +1942,7 @@ export default function Home() {
         colHeaders={data.length > 0 ? data[0] : true}
         rowHeaders={true}
         width="100%"
-        height="100%"
+        height="calc(100% - 40px)" /* Make room for tabs */
         licenseKey="non-commercial-and-evaluation"
         contextMenu={true}
         manualColumnResize={true}
@@ -1953,6 +1984,14 @@ export default function Home() {
             }
           }
         }}
+      />
+      
+      {/* Add SheetTabs component here */}
+      <SheetTabs
+        sheets={sheets}
+        activeSheetId={activeSheetId}
+        onChangeSheet={handleSheetChange}
+        onAddSheet={addSheet}
       />
             </div>
             
@@ -2609,9 +2648,7 @@ export default function Home() {
         </div>
       )}
 
-      <button onClick={navigateToHome} className={styles.backButton}>
-        ← Back to Files
-      </button>
+     
 
       {/* Add to Dashboard Modal */}
       {showAddToDashboardModal && (

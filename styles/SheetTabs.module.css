@@ -1,0 +1,49 @@
+.sheetTabsContainer {
+  display: flex;
+  align-items: center;
+  padding: 4px 8px;
+  background-color: #f5f5f5;
+  border-top: 1px solid #ddd;
+}
+
+.sheetTabs {
+  display: flex;
+  overflow-x: auto;
+  flex: 1;
+}
+
+.sheetTab {
+  padding: 8px 16px;
+  border-right: 1px solid #ddd;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.sheetTab:hover {
+  background-color: #eee;
+}
+
+.activeSheet {
+  background-color: white;
+  border-bottom: 2px solid #4F46E5;
+  font-weight: 500;
+}
+
+.sheetName {
+  font-size: 14px;
+}
+
+.addSheetButton {
+  margin-left: 8px;
+  padding: 4px 12px;
+  background-color: #4F46E5;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.addSheetButton:hover {
+  background-color: #4338CA;
+}

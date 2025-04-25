@@ -460,9 +460,9 @@ const AIPanel = ({ query, setQuery, aiResponse, setAiResponse, onAskAI, onClose,
       </div>
       
       <div className={styles.aiInputArea}>
-        <textarea
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
+      <textarea
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
           className={styles.aiInput}
           placeholder="Ask about your data or request calculations..."
           onKeyDown={(e) => {
@@ -472,14 +472,14 @@ const AIPanel = ({ query, setQuery, aiResponse, setAiResponse, onAskAI, onClose,
             }
           }}
         />
-        <button 
+      <button
           onClick={handleAskAI}
-          className={styles.askButton}
+        className={styles.askButton}
           disabled={!query.trim()}
-        >
+      >
           Ask
-        </button>
-      </div>
+      </button>
+        </div>
     </div>
   );
 };
