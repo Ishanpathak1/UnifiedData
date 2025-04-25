@@ -1,18 +1,10 @@
 {
-    "hosting": {
-      "public": "out",
-      "ignore": ["**/.*"],
-      "rewrites": [
-        {
-          "source": "/api/**",
-          "destination": "https://unifieddata-api-552541459765.us-central1.run.app/api/:path*"
-        },
-        {
-          "source": "**",
-          "destination": "/index.html"
-        }
-      ]
-    }
+  "hosting": {
+    "public": "public",
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**"
+    ]
   }
-  
-  
+}
