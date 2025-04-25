@@ -488,7 +488,7 @@ export default function Home() {
         }
       } else {
         // Regular query
-    const res = await fetch('/api/ask', {
+    const res = await fetch('https://unifieddata-api-552541459765.us-central1.run.app/api/ask', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ 
@@ -684,18 +684,23 @@ export default function Home() {
       
       if (docSnap.exists()) {
         const sheetData = docSnap.data();
+        console.log('Loaded spreadsheet data:', sheetData);
         
         setSpreadsheetId(id);
         
         if (sheetData.ownerId === user.uid) {
           if (sheetData.title) {
+            console.log('Loading title from database:', sheetData.title);
             setDocumentTitle(sheetData.title);
           } else {
+            console.log('No title found in database, using default');
             setDocumentTitle('Untitled spreadsheet');
           }
           
           // Load sheets data
           if (sheetData.sheets && Array.isArray(sheetData.sheets)) {
+            console.log('Loading sheets:', sheetData.sheets.length);
+            
             // Convert sheet data back to 2D arrays
             const processedSheets = sheetData.sheets.map(sheet => {
               // Check if data is in the converted format (objects instead of arrays)
@@ -741,6 +746,7 @@ export default function Home() {
               };
             });
             
+            console.log('Processed sheets:', processedSheets);
             setSheets(processedSheets);
             
             // Set first sheet as active and load it
@@ -780,6 +786,7 @@ export default function Home() {
         toast.error('Spreadsheet not found');
       }
     } catch (error) {
+      console.error('Error loading spreadsheet:', error);
       toast.error('Failed to load spreadsheet');
     }
   };

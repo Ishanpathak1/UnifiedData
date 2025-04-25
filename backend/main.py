@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List, Optional, Dict, Any, Union, Tuple
@@ -16,6 +16,20 @@ from sklearn.pipeline import make_pipeline
 from sklearn.metrics import mean_squared_error, confusion_matrix, classification_report, roc_auc_score, roc_curve
 import scipy.stats as stats
 from statsmodels.stats.outliers_influence import variance_inflation_factor
+from openai import OpenAI
+import os
+from dotenv import load_dotenv
+
+# Load environment variables from .env.local
+load_dotenv(".env.local")
+
+# Get API key from environment variable
+openai_api_key = os.getenv("OPENAI_API_KEY")
+if not openai_api_key:
+    raise ValueError("OPENAI_API_KEY is not set in .env.local file")
+
+# Initialize OpenAI client
+openai = OpenAI(api_key=openai_api_key)
 
 app = FastAPI()
 
@@ -889,7 +903,49 @@ async def predict_outcome(data: dict):
                 }
                 
             return result
+        
+        
             
     except Exception as e:
         print(f"Prediction error: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
+
+# AI query endpoint
+@app.post("/api/ask")
+async def ask_ai(request: Request):
+    data = await request.json()
+    query = data.get("query")
+    spreadsheet_data = data.get("data")
+    
+    if not query or not spreadsheet_data:
+        return {"error": "Missing query or spreadsheet data"}
+
+    # Format spreadsheet data for the prompt
+    formatted_data = "\n".join(["\t".join(map(str, row)) for row in spreadsheet_data])
+
+    prompt = f"""
+Here is a spreadsheet table (tab-separated):
+
+{formatted_data}
+
+User's question: {query}
+
+Analyze the spreadsheet data and give a clear, helpful answer based on the data. 
+If the question requires calculations, show your work.
+If the answer involves identifying trends or patterns, explain them.
+If the data is incomplete or doesn't contain information to answer the question, say so.
+"""
+
+    try:
+        response = openai.chat.completions.create(
+            model="gpt-4o",
+            messages=[{"role": "user", "content": prompt}]
+        )
+        return {"answer": response.choices[0].message.content}
+    except Exception as e:
+        return {"error": str(e)}
+
+# Run with: uvicorn main:app --reload
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run("main:app", host="0.0.0.0", port=8080, reload=True)
