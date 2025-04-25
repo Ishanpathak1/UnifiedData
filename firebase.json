@@ -1,19 +1,30 @@
 {
-    "hosting": {
-      "public": "public",
-      "rewrites": [
-        {
-          "source": "/api/**",
+    "hosting": [
+      {
+        "target": "unifieddata-api",
+        "appHosting": {
           "run": {
-            "serviceId": "unifieddata-api",
+            "runtime": "custom",
+            "entry": "Dockerfile",
             "region": "us-central1"
           }
-        },
-        {
-          "source": "**",
-          "destination": "/index.html"
         }
-      ]
-    }
+      },
+      {
+        "target": "frontend",
+        "public": "public",
+       "rewrites": [
+          {
+            "source": "/api/**",
+            "destination": "https://unifieddata-api-552541459765.us-central1.run.app/api/:path*"
+          },
+          {
+            "source": "**",
+            "destination": "/index.html"
+          }
+        ]
+      }
+    ]
   }
+  
   

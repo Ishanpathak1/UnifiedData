@@ -1,6 +1,15 @@
 {
-    "projects": {
-      "default": "onedata-a376a"
+  "projects": {
+    "default": "onedata-a376a"
+  },
+  "targets": {
+    "onedata-a376a": {
+      "hosting": {
+        "unifieddata-api": [
+          "unifieddata-api"
+        ]
+      }
     }
-  }
-  
+  },
+  "etags": {}
+}
