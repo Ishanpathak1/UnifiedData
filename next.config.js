@@ -1,17 +1,19 @@
-/** @type {import('next').NextConfig} */
+const isDev = process.env.NODE_ENV === 'development'
+
 const nextConfig = {
   reactStrictMode: true,
-  async rewrites() {
-    return [
-      {
-        source: '/api/:path*',
-        destination: 'http://localhost:8000/:path*', // Proxy API requests to your Python server
-      },
-    ];
-  },
+  output: 'export',
   images: {
     domains: ['lh3.googleusercontent.com'],
   },
+  ...(isDev && {
+    async rewrites() {
+      return [
+        {
+          source: '/api/:path*',
+          destination: 'http://localhost:8000/:path*',
+        },
+      ];
+    },
+  }),
 };
-
-module.exports = nextConfig; 
