@@ -191,7 +191,7 @@ export default function LandingPage() {
   return (
     <div className={styles.landingPage}>
       <Head>
-        <title>AI Sheet | Intelligent Spreadsheets</title>
+        <title>UnifiedData | Intelligent Spreadsheets</title>
         <meta name="description" content="AI-powered spreadsheet application with intelligent data analysis, visualization, and insights." />
       </Head>
       
@@ -199,7 +199,7 @@ export default function LandingPage() {
       <header className={styles.header}>
         <div className={styles.logo}>
           <span className={styles.logoIcon}>📊</span>
-          <span className={styles.logoText}>AI Sheet</span>
+          <span className={styles.logoText}>UnifiedData</span>
         </div>
         
         <div className={styles.headerRight}>
@@ -422,7 +422,7 @@ export default function LandingPage() {
               </div>
             ) : (
               <div className={styles.signInContainer}>
-                <p className={styles.signInMessage}>Sign in to get started with AI Sheet</p>
+                <p className={styles.signInMessage}>Sign in to get started with UnifiedData</p>
                 <SignIn />
               </div>
             )}
@@ -432,7 +432,7 @@ export default function LandingPage() {
       
       {/* Footer */}
       <footer className={styles.footer}>
-        <p>© {new Date().getFullYear()} AI Sheet. All rights reserved.</p>
+        <p>© {new Date().getFullYear()} UnifiedData. All rights reserved.</p>
       </footer>
     </div>
   );
