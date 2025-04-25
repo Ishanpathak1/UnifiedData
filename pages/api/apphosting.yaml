@@ -1,0 +1,4 @@
+run:
+  runtime: custom
+  service: unifieddata-api
+  region: us-central1
