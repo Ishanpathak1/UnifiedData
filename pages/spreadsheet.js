@@ -614,7 +614,6 @@ export default function Home() {
     
     // Store these updated sheets in state
     setSheets(updatedSheets);
-    console.log("Sheets to save:", JSON.stringify(updatedSheets.map(s => ({id: s.id, name: s.name}))));
     
     setIsSaving(true);
     
@@ -642,8 +641,6 @@ export default function Home() {
         ownerName: user.displayName || 'Unknown User'
       };
       
-      console.log(`Saving document with title: "${documentTitle}" and ${updatedSheets.length} sheets`);
-      
       if (docId && docId !== 'new') {
         await updateDoc(doc(db, 'spreadsheets', docId), serializedData);
         setSpreadsheetId(docId);
@@ -661,7 +658,6 @@ export default function Home() {
       setLastSaved(new Date());
       toast.success('Spreadsheet saved successfully');
     } catch (error) {
-      console.error('Error saving spreadsheet:', error);
       toast.error('Failed to save spreadsheet');
     } finally {
       setIsSaving(false);
@@ -688,23 +684,18 @@ export default function Home() {
       
       if (docSnap.exists()) {
         const sheetData = docSnap.data();
-        console.log('Loaded spreadsheet data:', sheetData);
         
         setSpreadsheetId(id);
         
         if (sheetData.ownerId === user.uid) {
           if (sheetData.title) {
-            console.log('Loading title from database:', sheetData.title);
             setDocumentTitle(sheetData.title);
           } else {
-            console.log('No title found in database, using default');
             setDocumentTitle('Untitled spreadsheet');
           }
           
           // Load sheets data
           if (sheetData.sheets && Array.isArray(sheetData.sheets)) {
-            console.log('Loading sheets:', sheetData.sheets.length);
-            
             // Convert sheet data back to 2D arrays
             const processedSheets = sheetData.sheets.map(sheet => {
               // Check if data is in the converted format (objects instead of arrays)
@@ -750,7 +741,6 @@ export default function Home() {
               };
             });
             
-            console.log('Processed sheets:', processedSheets);
             setSheets(processedSheets);
             
             // Set first sheet as active and load it
@@ -790,7 +780,6 @@ export default function Home() {
         toast.error('Spreadsheet not found');
       }
     } catch (error) {
-      console.error('Error loading spreadsheet:', error);
       toast.error('Failed to load spreadsheet');
     }
   };
@@ -846,13 +835,10 @@ export default function Home() {
     const docId = spreadsheetId || router.query.id;
     
     if (!docId || docId === 'new') {
-      console.log("No spreadsheet ID for auto-save, skipping");
       return;
     }
     
     try {
-      console.log("Auto-saving spreadsheet:", docId);
-      
       // Update current sheet with latest data
       const currentData = hotRef.current.hotInstance.getData();
       const updatedSheets = sheets.map(sheet => 
@@ -879,15 +865,13 @@ export default function Home() {
       
       await updateDoc(doc(db, 'spreadsheets', docId), serializedData);
       
-      // Update last saved time
+      // Update last saved time without notification
       setLastSaved(new Date());
-      
-      console.log('Auto-saved spreadsheet:', docId);
       
       // After successful save, try to update dependent dashboards
       await updateDependentDashboards();
     } catch (error) {
-      console.error("Error auto-saving spreadsheet:", error);
+      // Silently handle errors during auto-save
     }
   };
 
@@ -1202,170 +1186,117 @@ export default function Home() {
 
   // Add this function after autoSaveSpreadsheet
   const updateDependentDashboards = async () => {
-    // Get the ID from either state or URL
+    // Skip if missing data or new document without ID
     const docId = spreadsheetId || router.query.id;
-    
-    if (!user || !docId || !hotRef.current) {
-      console.log("Cannot update dashboards:", {
-        user: !!user,
-        spreadsheetId: docId,
-        hotRef: !!hotRef.current
-      });
+    if (!user || !docId || docId === 'new' || !hotRef.current) {
       return;
     }
-    
-    console.log("Updating dependent dashboards for spreadsheet:", docId);
-    
+
     try {
-      // Get current data from the spreadsheet
+      // Get the current data
       const currentData = hotRef.current.hotInstance.getData();
-      console.log("Current spreadsheet data length:", currentData.length);
       
-      // First, find dashboards that belong to this user
-      console.log("Querying for dashboards");
-      
-      // Query all user's dashboards
+      // Query for dashboards that might use this spreadsheet
       const dashboardsRef = collection(db, 'dashboards');
       const q = firestoreQuery(dashboardsRef, firestoreWhere('ownerId', '==', user.uid));
-      
       const querySnapshot = await getDocs(q);
-      console.log("Found", querySnapshot.size, "dashboards to check");
       
-      // Process each dashboard
       let updatedCount = 0;
       
+      // Check each dashboard to see if it uses this spreadsheet
       for (const dashboardDoc of querySnapshot.docs) {
-        const dashboard = dashboardDoc.data();
         const dashboardId = dashboardDoc.id;
-        
-        console.log(`Checking dashboard ${dashboardId}:`, dashboard.title);
+        const dashboard = dashboardDoc.data();
         
         // Skip if no items
-        if (!dashboard.items || !Array.isArray(dashboard.items)) {
-          console.log("Dashboard has no items:", dashboardId);
+        if (!dashboard.items || !Array.isArray(dashboard.items) || dashboard.items.length === 0) {
           continue;
         }
         
         const items = dashboard.items;
-        console.log(`Dashboard has ${items.length} items`);
+        let dashboardNeedsUpdate = false;
         
-        // Log each item to see what we're working with
-        items.forEach((item, index) => {
-          console.log(`Item ${index}:`, {
-            id: item.id,
-            type: item.type,
-            sourceSpreadsheetId: item.sourceSpreadsheetId,
-            sourceInfo: item.sourceInfo ? {
-              spreadsheetId: item.sourceInfo.spreadsheetId,
-              hasRange: !!item.sourceInfo.range
-            } : null
-          });
-        });
+        // Track which items need updates
+        const updatedItems = [...items];
         
-        let itemsNeedUpdate = false;
-        
-        // Check each item to see if it uses this spreadsheet
-        const updatedItems = items.map(item => {
-          // Skip if not a chart
+        // Check each chart item
+        for (let index = 0; index < items.length; index++) {
+          const item = items[index];
+          
+          // Skip non-chart items
           if (item.type !== 'chart') {
-            return item;
+            continue;
           }
           
-          // Check for source spreadsheet ID in different possible locations
+          // Look for items using this spreadsheet
           const itemSpreadsheetId = 
             item.sourceInfo?.spreadsheetId || 
             item.sourceSpreadsheetId || 
             item.chartConfig?.sourceInfo?.spreadsheetId;
           
-          console.log(`Chart ${item.id} sourceSpreadsheetId:`, itemSpreadsheetId);
-          
-          // Skip if doesn't use this spreadsheet
           if (itemSpreadsheetId !== docId) {
-            console.log(`Chart ${item.id} doesn't use this spreadsheet`);
-            return item;
+            continue;
           }
           
-          console.log("Found chart using this spreadsheet:", item.id);
-          
-          // Get range info from wherever it might be stored
-          const range = 
-            item.sourceInfo?.range || 
-            item.chartConfig?.sourceInfo?.range;
-          
+          // Get range info
+          const range = item.sourceInfo?.range;
           if (!range) {
-            console.log("Chart has no range info:", item.id);
-            return item;
+            continue;
           }
           
-          console.log("Chart range:", range);
-          
-          // Extract the relevant data based on the range
           const { startRow, startCol, endRow, endCol } = range;
           
-          // Extract data for the chart from current spreadsheet data
+          // Extract data based on the range
           const extractedData = [];
           for (let row = startRow; row <= Math.min(endRow, currentData.length - 1); row++) {
             if (!currentData[row]) continue;
             
             const rowData = [];
-            for (let col = startCol; col <= Math.min(endCol, currentData[row].length - 1); col++) {
-              rowData.push(currentData[row][col]);
+            for (let col = startCol; col <= Math.min(endCol, (currentData[row].length || 0) - 1); col++) {
+              rowData.push(currentData[row][col] || '');
             }
-            
-            if (rowData.some(cell => cell !== '')) {
-              extractedData.push(rowData);
-            }
+            extractedData.push(rowData);
           }
           
-          console.log("Extracted data for chart update:", extractedData);
-          
-          // No data to update
           if (extractedData.length === 0) {
-            console.log("No data extracted for chart:", item.id);
-            return item;
+            continue;
           }
           
-          // Update the chart config based on chart type
-          const updatedConfig = updateChartDataInConfig(item.chartConfig, extractedData);
-          
-          // Return updated item
-          itemsNeedUpdate = true;
-          return {
-            ...item,
-            chartConfig: updatedConfig,
-            sourceInfo: {
-              ...item.sourceInfo,
-              lastUpdated: new Date().toISOString()
-            }
-          };
-        });
+          // Update the chart config with new data
+          if (item.chartConfig) {
+            const updatedChartConfig = updateChartDataInConfig(
+              JSON.parse(JSON.stringify(item.chartConfig)), 
+              extractedData
+            );
+            
+            updatedItems[index] = {
+              ...item,
+              chartConfig: updatedChartConfig,
+              sourceInfo: {
+                ...item.sourceInfo,
+                lastUpdated: new Date().toISOString()
+              }
+            };
+            
+            dashboardNeedsUpdate = true;
+          }
+        }
         
-        // Only update if something changed
-        if (itemsNeedUpdate) {
-          console.log("Updating dashboard with new chart data:", dashboardId);
-          
-          // Sanitize for Firestore and update
-          const sanitizedItems = sanitizeForFirestore(updatedItems);
-          
+        // If any items were updated, update the dashboard
+        if (dashboardNeedsUpdate) {
           await updateDoc(doc(db, 'dashboards', dashboardId), {
-            items: sanitizedItems,
+            items: sanitizeForFirestore(updatedItems),
             lastModified: serverTimestamp()
           });
           
           updatedCount++;
-        } else {
-          console.log("No items needed updates in dashboard:", dashboardId);
         }
       }
       
-      console.log(`Updated ${updatedCount} dashboards with new data`);
+      // No notification here to keep it silent
       
-      if (updatedCount > 0) {
-        toast.success(`Updated ${updatedCount} dashboard${updatedCount > 1 ? 's' : ''} with latest data`);
-      }
     } catch (error) {
-      console.error("Error updating dependent dashboards:", error);
-      toast.error("Failed to update dashboards with latest data");
+      // Silently fail for auto-updates
     }
   };
 
