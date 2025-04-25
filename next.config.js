@@ -12,7 +12,7 @@ const nextConfig = {
       {
         source: '/api/:path*',
         destination: isDev
-          ? 'http://localhost:8000/:path*'
+          ? 'https://unifieddata-api-552541459765.us-central1.run.app/api/:path*'
           : 'https://unifieddata-api-552541459765.us-central1.run.app/api/:path*',
       },
     ];

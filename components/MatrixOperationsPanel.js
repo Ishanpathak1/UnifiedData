@@ -226,7 +226,7 @@ export default function MatrixOperationsPanel({ hotRef, onClose }) {
           throw new Error("This operation requires the server to be running");
         }
       } else {
-        const response = await fetch('http://localhost:8000/matrix-operations', {
+        const response = await fetch('https://unifieddata-api-552541459765.us-central1.run.app/matrix-operations', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',

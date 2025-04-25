@@ -230,7 +230,7 @@ const RegressionAnalysisPanel = ({ hotRef, onClose }) => {
       }
       
       // Call API with the possibly transformed values
-      const response = await fetch('http://localhost:8000/regression', {
+      const response = await fetch('https://unifieddata-api-552541459765.us-central1.run.app/regression', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -803,7 +803,7 @@ const RegressionAnalysisPanel = ({ hotRef, onClose }) => {
       setPredictionResult(null);
       setLoading(true);
       
-      const response = await fetch('http://localhost:8000/predict', {
+      const response = await fetch('https://unifieddata-api-552541459765.us-central1.run.app/predict', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

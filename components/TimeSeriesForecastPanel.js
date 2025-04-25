@@ -143,7 +143,7 @@ const TimeSeriesForecastPanel = ({ hotRef, onClose }) => {
       };
       
       // Call API
-      const response = await fetch('http://localhost:8000/forecast', {
+      const response = await fetch('https://unifieddata-api-552541459765.us-central1.run.app/forecast', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

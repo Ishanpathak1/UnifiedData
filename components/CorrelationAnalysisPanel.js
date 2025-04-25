@@ -189,7 +189,7 @@ const CorrelationAnalysisPanel = ({ hotRef, onClose }) => {
       console.log("Request body:", requestBody.substring(0, 100) + "...");
       
       // Call API with the data
-      const response = await fetch('http://localhost:8000/correlation', {
+      const response = await fetch('https://unifieddata-api-552541459765.us-central1.run.app/correlation', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
