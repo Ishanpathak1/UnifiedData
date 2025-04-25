@@ -7,6 +7,25 @@ import styles from '../styles/Home.module.css';
 import authStyles from '../styles/Auth.module.css';
 import SignIn from '../components/auth/SignIn';
 import Head from 'next/head';
+import LandingPage from '../components/LandingPage';
+
+function TypingText({ text, delay = 40 }) {
+  const [displayedText, setDisplayedText] = useState('');
+  const [currentIndex, setCurrentIndex] = useState(0);
+  
+  useEffect(() => {
+    if (currentIndex < text.length) {
+      const timeout = setTimeout(() => {
+        setDisplayedText(prevText => prevText + text[currentIndex]);
+        setCurrentIndex(prevIndex => prevIndex + 1);
+      }, delay);
+      
+      return () => clearTimeout(timeout);
+    }
+  }, [currentIndex, delay, text]);
+  
+  return <div>{displayedText}<span className={styles.cursor}>|</span></div>;
+}
 
 export default function Home() {
   const { user, loading } = useAuth();
@@ -71,47 +90,7 @@ export default function Home() {
 
   if (!user) {
     return (
-      <div className={authStyles.welcomeContainer}>
-        <Head>
-          <title>UnifiedData - Your Data, Unified</title>
-          <meta name="description" content="UnifiedData is a comprehensive data analysis, visualization, and management platform. Sign in to get started." />
-        </Head>
-        <div className={authStyles.welcomeCard}>
-          <div className={authStyles.logoContainer}>
-            <div className={authStyles.logo}>UnifiedData</div>
-          </div>
-          <h1 className={authStyles.welcomeTitle}>Welcome to UnifiedData</h1>
-          <p className={authStyles.welcomeSubtitle}>
-            Your all-in-one platform for data analysis, visualization, and collaborative insights.
-          </p>
-          
-          <div className={authStyles.signInCta}>
-            <SignIn />
-            <p className={authStyles.signInHint}>
-              Sign in to create spreadsheets, build dashboards, and analyze your data.
-            </p>
-          </div>
-          
-          <div className={authStyles.features}>
-            <div className={authStyles.featureItem}>
-              <span className={authStyles.featureIcon}>✓</span>
-              <span>Advanced Analysis</span>
-            </div>
-            <div className={authStyles.featureItem}>
-              <span className={authStyles.featureIcon}>✓</span>
-              <span>Interactive Dashboards</span>
-            </div>
-            <div className={authStyles.featureItem}>
-              <span className={authStyles.featureIcon}>✓</span>
-              <span>Cloud Storage</span>
-            </div>
-            <div className={authStyles.featureItem}>
-              <span className={authStyles.featureIcon}>✓</span>
-              <span>Collaboration Tools</span>
-            </div>
-          </div>
-        </div>
-      </div>
+      <LandingPage />
     );
   }
 
