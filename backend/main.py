@@ -920,11 +920,79 @@ async def ask_ai(request: Request):
     if not query or not spreadsheet_data:
         return {"error": "Missing query or spreadsheet data"}
 
+    # Extract headers (first row)
+    headers = spreadsheet_data[0] if spreadsheet_data and len(spreadsheet_data) > 0 else []
+    
+    # Check if data is large (more than 300 rows)
+    is_large_data = len(spreadsheet_data) > 200
+    
     # Format spreadsheet data for the prompt
-    formatted_data = "\n".join(["\t".join(map(str, row)) for row in spreadsheet_data])
+    if is_large_data:
+        # Take first 50 rows for context (including headers)
+        first_rows = spreadsheet_data[:51]  # This includes the header row
+        
+        # Take last 50 rows for context
+        last_rows = spreadsheet_data[-50:] if len(spreadsheet_data) > 100 else []
+        
+        # Calculate basic statistics for numeric columns
+        stats = {}
+        for col_idx, header in enumerate(headers):
+            # Try to extract numeric values from this column
+            try:
+                numeric_values = [float(row[col_idx]) for row in spreadsheet_data[1:] 
+                                 if col_idx < len(row) and row[col_idx] != '' and 
+                                 str(row[col_idx]).replace('.', '', 1).replace('-', '', 1).isdigit()]
+                
+                if numeric_values:
+                    stats[header] = {
+                        "min": min(numeric_values),
+                        "max": max(numeric_values),
+                        "mean": sum(numeric_values) / len(numeric_values),
+                        "count": len(numeric_values)
+                    }
+            except:
+                continue
+        
+        # Format first rows
+        formatted_first_rows = "\n".join(["\t".join(map(str, row)) for row in first_rows])
+        
+        # Format last rows if we have them
+        formatted_last_rows = ""
+        if last_rows:
+            formatted_last_rows = "\n".join(["\t".join(map(str, row)) for row in last_rows])
+        
+        # Format stats
+        formatted_stats = "\n".join([f"{header}: min={stats[header]['min']:.2f}, max={stats[header]['max']:.2f}, mean={stats[header]['mean']:.2f}, count={stats[header]['count']}" 
+                                    for header in stats])
+        
+        prompt = f"""
+Here is a large spreadsheet (total {len(spreadsheet_data)} rows) with a sample of the data (tab-separated).
+The column headers are: {', '.join(str(h) for h in headers)}
 
-    prompt = f"""
+First 50 rows (including headers):
+{formatted_first_rows}
+
+{"Last 50 rows:" if formatted_last_rows else ""}
+{formatted_last_rows if formatted_last_rows else ""}
+
+Summary statistics for numeric columns:
+{formatted_stats}
+
+User's question: {query}
+
+Analyze the spreadsheet data sample and statistics to give a clear, helpful answer. 
+Be explicit that you're working with a sample of a larger dataset ({len(spreadsheet_data)} rows).
+If the question requires calculations, show your work and note that you're using the provided statistics or sample.
+If the answer involves identifying trends or patterns, explain them but note the limitations of working with a sample.
+If you need the complete dataset to answer accurately, say so.
+"""
+    else:
+        # For smaller datasets, use the original approach but highlight the headers
+        formatted_data = "\n".join(["\t".join(map(str, row)) for row in spreadsheet_data])
+
+        prompt = f"""
 Here is a spreadsheet table (tab-separated):
+The column headers are: {', '.join(str(h) for h in headers)}
 
 {formatted_data}
 
@@ -944,6 +1012,7 @@ If the data is incomplete or doesn't contain information to answer the question,
         return {"answer": response.choices[0].message.content}
     except Exception as e:
         return {"error": str(e)}
+
 
 # Run with: uvicorn main:app --reload
 if __name__ == "__main__":

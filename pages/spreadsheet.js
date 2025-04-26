@@ -111,6 +111,10 @@ export default function Home() {
   const router = useRouter();
   const { user } = useAuth();
   
+  // Add these new refs here
+  const isSavingRef = useRef(false);
+  const allSheetsRef = useRef([]);
+  
   // State variables
   const [data, setData] = useState([
     ['Month', 'Sales', 'Marketing', 'Expenses', 'Profit', 'Growth', 'Units'],
@@ -600,37 +604,43 @@ export default function Home() {
     router.push('/');
   };
 
-  // Add this function to save the spreadsheet
+  // Completely revised saveSpreadsheet function
   const saveSpreadsheet = async () => {
     if (!user || !hotRef.current) return;
     
-    // First capture the current sheet's data
-    const currentData = hotRef.current.hotInstance.getData();
-    
-    // Update all sheets, keeping the current sheet's latest data
-    const updatedSheets = sheets.map(sheet => 
-      sheet.id === activeSheetId ? {...sheet, data: currentData} : sheet
-    );
-    
-    // Store these updated sheets in state
-    setSheets(updatedSheets);
-    
-    setIsSaving(true);
+    // Prevent multiple concurrent saves
+    if (isSavingRef.current) {
+      console.log("Save operation already in progress, skipping");
+      return;
+    }
     
     try {
+      isSavingRef.current = true;
+      setIsSaving(true);
+      
+      // First capture the current sheet's data
+      const currentData = hotRef.current.hotInstance.getData();
+      
+      // Create a deep copy of the current sheets array
+      const updatedSheets = sheets.map(sheet => 
+        sheet.id === activeSheetId ? {...sheet, data: currentData} : {...sheet}
+      );
+      
+      // Update state
+      setSheets(updatedSheets);
+      
       // Use current spreadsheet ID or one from URL
       const docId = spreadsheetId || router.query.id;
       
       // Create serialized data for Firestore
       const serializedData = {
-        title: documentTitle, // Current title
+        title: documentTitle,
         sheets: updatedSheets.map(sheet => ({
           id: sheet.id,
-          name: sheet.name, // Make sure sheet name is preserved
+          name: sheet.name,
           data: sheet.data.map((row, rowIndex) => {
-            // Convert each row to an object
             return row.reduce((rowObj, cellValue, colIndex) => {
-              rowObj[`cell_${colIndex}`] = cellValue;
+              rowObj[`cell_${colIndex}`] = cellValue || '';
               return rowObj;
             }, { rowIndex });
           })
@@ -657,10 +667,13 @@ export default function Home() {
       
       setLastSaved(new Date());
       toast.success('Spreadsheet saved successfully');
+      
     } catch (error) {
+      console.error('Error saving spreadsheet:', error);
       toast.error('Failed to save spreadsheet');
     } finally {
       setIsSaving(false);
+      isSavingRef.current = false;
     }
   };
 
@@ -747,7 +760,10 @@ export default function Home() {
             });
             
             console.log('Processed sheets:', processedSheets);
+            
+            // Store in both state and ref
             setSheets(processedSheets);
+            allSheetsRef.current = processedSheets;
             
             // Set first sheet as active and load it
             if (processedSheets.length > 0) {
@@ -1479,71 +1495,36 @@ export default function Home() {
   // Add these functions to your main component
   const addSheet = () => {
     // Get current sheet data before adding new sheet
-    let updatedSheets = [...sheets];
-    
-    // If there's active data in the current sheet, save it first
     if (hotRef.current && activeSheetId) {
       const currentData = hotRef.current.hotInstance.getData();
-      updatedSheets = updatedSheets.map(sheet => 
-        sheet.id === activeSheetId ? {...sheet, data: currentData} : sheet
+      
+      // Update the current sheets list with the latest data from the active sheet
+      const updatedSheets = sheets.map(sheet => 
+        sheet.id === activeSheetId ? {...sheet, data: currentData} : {...sheet}
       );
-    }
-    
-    // Create the new sheet with a unique ID
-    const newSheetId = `sheet_${Date.now()}`;
-    const newSheet = {
-      id: newSheetId,
-      name: `Sheet ${updatedSheets.length + 1}`,
-      data: [['', '', '', ''], ['', '', '', '']]
-    };
-    
-    // Add the new sheet to our updated list
-    const newSheets = [...updatedSheets, newSheet];
-    
-    // Update state
-    setSheets(newSheets);
-    setActiveSheetId(newSheetId);
-    
-    // Load empty data into the spreadsheet
-    if (hotRef.current) {
-      hotRef.current.hotInstance.loadData(newSheet.data);
-      setData(newSheet.data);
-    }
-    
-    // Auto-save immediately
-    if (user && spreadsheetId && spreadsheetId !== 'new') {
-      setIsSaving(true);
       
-      // Create a complete serialized data object
-      const serializedSheets = newSheets.map(sheet => ({
-        id: sheet.id,
-        name: sheet.name,
-        data: sheet.data.map((row, rowIndex) => {
-          return row.reduce((rowObj, cellValue, colIndex) => {
-            rowObj[`cell_${colIndex}`] = cellValue;
-            return rowObj;
-          }, { rowIndex });
-        })
-      }));
-      
-      const serializedData = {
-        title: documentTitle, // Keep the current title
-        sheets: serializedSheets,
-        lastModified: serverTimestamp()
+      // Create the new sheet
+      const newSheetId = `sheet_${Date.now()}`;
+      const newSheet = {
+        id: newSheetId,
+        name: `Sheet ${updatedSheets.length + 1}`,
+        data: [['', '', '', ''], ['', '', '', '']]
       };
       
-      updateDoc(doc(db, 'spreadsheets', spreadsheetId), serializedData)
-        .then(() => {
-          setLastSaved(new Date());
-          toast.success('New sheet added and saved');
-        })
-        .catch(error => {
-          console.error('Error saving new sheet:', error);
-          toast.error('Failed to save new sheet');
-        })
-        .finally(() => {
-          setIsSaving(false);
-        });
+      // Add the new sheet to the updated list
+      const newSheets = [...updatedSheets, newSheet];
+      
+      // Update state
+      setSheets(newSheets);
+      
+      // Update active sheet ID
+      setActiveSheetId(newSheetId);
+      
+      // Load the new sheet data into the spreadsheet
+      if (hotRef.current) {
+        hotRef.current.hotInstance.loadData(newSheet.data);
+        setData(newSheet.data);
+      }
     }
   };
   
@@ -1552,24 +1533,21 @@ export default function Home() {
     if (hotRef.current && activeSheetId) {
       const currentData = hotRef.current.hotInstance.getData();
       
-      // Update the current sheet with its latest data
+      // Update the current sheets list with the latest data from the active sheet
       setSheets(prevSheets => {
-        const updatedSheets = prevSheets.map(sheet => 
+        return prevSheets.map(sheet => 
           sheet.id === activeSheetId ? {...sheet, data: currentData} : sheet
         );
-        console.log("Updated sheets after change:", updatedSheets.map(s => s.name));
-        return updatedSheets;
       });
     }
     
-    // Switch to new sheet
+    // Set the new active sheet
     setActiveSheetId(sheetId);
     
-    // Load new sheet data with a slight delay to ensure state is updated
+    // Load the new sheet data
     setTimeout(() => {
       const selectedSheet = sheets.find(sheet => sheet.id === sheetId);
       if (selectedSheet && hotRef.current) {
-        console.log("Loading sheet:", selectedSheet.name);
         hotRef.current.hotInstance.loadData(selectedSheet.data);
         setData(selectedSheet.data);
       }
@@ -1630,15 +1608,17 @@ export default function Home() {
     // Only run if we have sheets
     if (sheets.length === 0) return;
     
-    // Create a debounced save when sheet changes
-    const saveTimeout = setTimeout(() => {
-      if (hotRef.current) {
-        console.log("Auto-saving after sheet change");
-        saveSpreadsheet();
-      }
-    }, 1000);
-    
-    return () => clearTimeout(saveTimeout);
+    // IMPORTANT: Don't trigger auto-save here as it can conflict with manual saves
+    // Instead, just make sure we update the sheet data in the state
+    if (hotRef.current) {
+      const currentData = hotRef.current.hotInstance.getData();
+      
+      setSheets(prevSheets => 
+        prevSheets.map(sheet => 
+          sheet.id === activeSheetId ? {...sheet, data: currentData} : sheet
+        )
+      );
+    }
   }, [activeSheetId]);
 
   // Helper function to save sheets to database
@@ -1683,6 +1663,23 @@ export default function Home() {
         setIsSaving(false);
       });
   };
+
+  // 1. First, add a ref to track if we're in the middle of a save operation
+
+
+  // 2. Add an effect to keep the ref in sync with state
+  useEffect(() => {
+    allSheetsRef.current = sheets;
+  }, [sheets]);
+
+  // Add this useEffect after your other useEffect declarations
+  useEffect(() => {
+    // Keep ref in sync with state
+    if (sheets && sheets.length > 0) {
+      allSheetsRef.current = [...sheets];
+      console.log("Updated sheets ref, now contains:", sheets.map(s => s.name));
+    }
+  }, [sheets]);
 
   return (
     <div className={styles.container}>
