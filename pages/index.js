@@ -2,12 +2,14 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { useAuth } from '../contexts/AuthContext';
 import { db } from '../utils/firebase';
-import { collection, query, where, getDocs, orderBy } from 'firebase/firestore';
+import { collection, query, where, getDocs, orderBy, deleteDoc, doc } from 'firebase/firestore';
 import styles from '../styles/Home.module.css';
 import authStyles from '../styles/Auth.module.css';
 import SignIn from '../components/auth/SignIn';
 import Head from 'next/head';
 import LandingPage from '../components/LandingPage';
+import ContextMenu from '../components/ContextMenu';
+import DeleteConfirmModal from '../components/DeleteConfirmModal';
 
 function TypingText({ text, delay = 40 }) {
   const [displayedText, setDisplayedText] = useState('');
@@ -31,39 +33,41 @@ export default function Home() {
   const { user, loading } = useAuth();
   const [spreadsheets, setSpreadsheets] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [contextMenu, setContextMenu] = useState(null);
+  const [deleteModal, setDeleteModal] = useState({ isOpen: false, spreadsheet: null });
   const router = useRouter();
 
-  useEffect(() => {
-    // Fetch user's spreadsheets when user is authenticated
-    const fetchSpreadsheets = async () => {
-      if (!user) return;
+  // Function to fetch spreadsheets
+  const fetchSpreadsheets = async () => {
+    if (!user) return;
+    
+    setIsLoading(true);
+    try {
+      const q = query(
+        collection(db, 'spreadsheets'),
+        where('ownerId', '==', user.uid),
+        orderBy('lastModified', 'desc')
+      );
       
-      setIsLoading(true);
-      try {
-        const q = query(
-          collection(db, 'spreadsheets'),
-          where('ownerId', '==', user.uid),
-          orderBy('lastModified', 'desc')
-        );
-        
-        const querySnapshot = await getDocs(q);
-        const spreadsheetsData = [];
-        
-        querySnapshot.forEach((doc) => {
-          spreadsheetsData.push({
-            id: doc.id,
-            ...doc.data()
-          });
+      const querySnapshot = await getDocs(q);
+      const spreadsheetsData = [];
+      
+      querySnapshot.forEach((doc) => {
+        spreadsheetsData.push({
+          id: doc.id,
+          ...doc.data()
         });
-        
-        setSpreadsheets(spreadsheetsData);
-      } catch (error) {
-        console.error('Error fetching spreadsheets:', error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
+      });
+      
+      setSpreadsheets(spreadsheetsData);
+    } catch (error) {
+      console.error('Error fetching spreadsheets:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
+  useEffect(() => {
     if (!loading) {
       fetchSpreadsheets();
     }
@@ -75,6 +79,48 @@ export default function Home() {
 
   const openSpreadsheet = (id) => {
     router.push(`/spreadsheet?id=${id}`);
+  };
+
+  // Handle right-click on spreadsheet card
+  const handleContextMenu = (e, spreadsheet) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setContextMenu({
+      x: e.clientX,
+      y: e.clientY,
+      spreadsheet
+    });
+  };
+
+  // Close context menu
+  const closeContextMenu = () => {
+    setContextMenu(null);
+  };
+
+  // Open delete confirmation modal
+  const openDeleteModal = (spreadsheet) => {
+    setDeleteModal({ isOpen: true, spreadsheet });
+  };
+
+  // Close delete confirmation modal
+  const closeDeleteModal = () => {
+    setDeleteModal({ isOpen: false, spreadsheet: null });
+  };
+
+  // Delete spreadsheet
+  const deleteSpreadsheet = async () => {
+    const spreadsheetId = deleteModal.spreadsheet?.id;
+    if (!spreadsheetId) return;
+    
+    try {
+      await deleteDoc(doc(db, 'spreadsheets', spreadsheetId));
+      setSpreadsheets(prev => prev.filter(sheet => sheet.id !== spreadsheetId));
+      console.log(`Spreadsheet ${spreadsheetId} deleted successfully`);
+      closeDeleteModal();
+    } catch (error) {
+      console.error('Error deleting spreadsheet:', error);
+      alert('Failed to delete spreadsheet. Please try again.');
+    }
   };
 
   if (loading) {
@@ -95,7 +141,7 @@ export default function Home() {
   }
 
   return (
-    <div className={styles.container}>
+    <div className={styles.container} onClick={closeContextMenu}>
       <Head>
         <title>UnifiedData - Your Spreadsheets</title>
       </Head>
@@ -124,15 +170,15 @@ export default function Home() {
       <main className={styles.main}>
         <div className={styles.actionsBar}>
           <h2 className={styles.sectionTitle}>Your Spreadsheets</h2>
-        <button
+          <button
             className={styles.createButton}
             onClick={createNewSpreadsheet}
-        >
+          >
             <svg className={styles.createIcon} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
             </svg>
             Create New
-        </button>
+          </button>
         </div>
         
         {isLoading ? (
@@ -163,6 +209,7 @@ export default function Home() {
                 key={sheet.id} 
                 className={styles.spreadsheetCard}
                 onClick={() => openSpreadsheet(sheet.id)}
+                onContextMenu={(e) => handleContextMenu(e, sheet)}
               >
                 <div className={styles.cardPreview}>
                   <div className={styles.previewGrid}></div>
@@ -185,6 +232,44 @@ export default function Home() {
           </div>
         )}
       </main>
+      
+      {/* Context Menu */}
+      {contextMenu && (
+        <ContextMenu
+          x={contextMenu.x}
+          y={contextMenu.y}
+          onClose={closeContextMenu}
+          options={[
+            {
+              label: 'Open',
+              icon: '📄',
+              action: () => openSpreadsheet(contextMenu.spreadsheet.id)
+            },
+            {
+              label: 'Duplicate',
+              icon: '📋',
+              action: () => {
+                // Implement duplicate functionality
+                alert('Duplicate feature coming soon');
+              }
+            },
+            {
+              label: 'Delete',
+              icon: '🗑️',
+              danger: true,
+              action: () => openDeleteModal(contextMenu.spreadsheet)
+            }
+          ]}
+        />
+      )}
+      
+      {/* Delete Confirmation Modal */}
+      <DeleteConfirmModal
+        isOpen={deleteModal.isOpen}
+        onClose={closeDeleteModal}
+        onConfirm={deleteSpreadsheet}
+        itemName={deleteModal.spreadsheet?.title || 'this spreadsheet'}
+      />
     </div>
   );
 }
