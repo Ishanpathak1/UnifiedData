@@ -47,6 +47,9 @@ export default function DashboardView() {
   const [layouts, setLayouts] = useState({ lg: [] });
   const [isSaving, setIsSaving] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const [autoRefresh, setAutoRefresh] = useState(false);
+  const [refreshInterval, setRefreshInterval] = useState(60); // seconds
+  const autoRefreshTimerRef = useRef(null);
   
   const { width } = useWindowSize();
   const chartRefs = useRef({});
@@ -514,7 +517,7 @@ export default function DashboardView() {
     }
   };
 
-  // In pages/dashboard/[id].js - Update the fetchLatestChartData function
+  // Update the fetchLatestChartData function to properly handle the current data format
   const fetchLatestChartData = async (sourceInfo) => {
     if (!sourceInfo || !sourceInfo.spreadsheetId) {
       console.log("Missing source info or spreadsheet ID");
@@ -535,49 +538,64 @@ export default function DashboardView() {
       const spreadsheetData = docSnap.data();
       console.log("Spreadsheet data:", spreadsheetData);
       
-      // Check if we have serialized data
-      if (!spreadsheetData.serializedData || !spreadsheetData.serializedData.rows) {
-        console.error("Spreadsheet doesn't contain serialized data");
+      // Handle the current format of sheet data
+      if (!spreadsheetData.sheets || !Array.isArray(spreadsheetData.sheets) || spreadsheetData.sheets.length === 0) {
+        console.error("Spreadsheet has no sheets");
         return null;
       }
       
-      // Convert from serialized format to 2D array
-      const serializedRows = spreadsheetData.serializedData.rows;
+      // Use the first sheet by default or find the specific one if needed
+      const sheet = spreadsheetData.sheets[0];
       
-      // Create a map to hold row data
-      const rowMap = new Map();
-      serializedRows.forEach(row => {
-        const rowIndex = parseInt(row.rowId);
-        if (!rowMap.has(rowIndex)) {
-          rowMap.set(rowIndex, []);
-        }
+      // Convert the sheet data format to a 2D array
+      let data = [];
+      
+      // Check for cell_X format (the one used in saveCurrentSheets)
+      if (sheet.data && Array.isArray(sheet.data) && sheet.data.length > 0 && 
+          sheet.data[0] && typeof sheet.data[0] === 'object' && 'rowIndex' in sheet.data[0]) {
         
-        row.cells.forEach(cell => {
-          const colIndex = parseInt(cell.colId);
-          // Ensure array is big enough
-          while (rowMap.get(rowIndex).length <= colIndex) {
-            rowMap.get(rowIndex).push('');
+        console.log("Found cell-based serialized format");
+        
+        // This is the serialized format where each row has cell_0, cell_1, etc.
+        const rows = sheet.data.sort((a, b) => a.rowIndex - b.rowIndex);
+        
+        // Convert to 2D array
+        data = rows.map(row => {
+          const rowArray = [];
+          // Find the highest cell index
+          const cellKeys = Object.keys(row).filter(key => key.startsWith('cell_'));
+          const maxCellIndex = Math.max(...cellKeys.map(key => parseInt(key.replace('cell_', ''))));
+          
+          // Fill the row with data
+          for (let i = 0; i <= maxCellIndex; i++) {
+            rowArray.push(row[`cell_${i}`] || '');
           }
-          rowMap.get(rowIndex)[colIndex] = cell.value;
+          return rowArray;
         });
-      });
+      } 
+      // Check for direct 2D array format
+      else if (sheet.data && Array.isArray(sheet.data) && Array.isArray(sheet.data[0])) {
+        console.log("Found direct 2D array format");
+        data = sheet.data;
+      }
+      // Unknown format
+      else {
+        console.error("Unknown data format in spreadsheet");
+        return null;
+      }
       
-      // Convert map to 2D array
-      const rowIndices = Array.from(rowMap.keys()).sort((a, b) => a - b);
-      const data = rowIndices.map(rowIndex => rowMap.get(rowIndex));
+      console.log("Processed data:", data);
       
-      console.log("Deserialized data:", data);
-      
-      // Extract the relevant data based on source info
+      // Now handle the data based on source info (range or columns)
       if (sourceInfo.range) {
         console.log("Using range to extract data:", sourceInfo.range);
         const { startRow, startCol, endRow, endCol } = sourceInfo.range;
         
-        // Extract headers (from row 0 or startRow if it's 0)
+        // Extract headers
         const headerRow = startRow === 0 ? startRow : 0;
         const headers = [];
         if (data[headerRow]) {
-          for (let col = startCol; col <= endCol; col++) {
+          for (let col = startCol; col <= Math.min(endCol, data[headerRow].length - 1); col++) {
             headers.push(data[headerRow][col] || `Column ${col}`);
           }
         }
@@ -585,21 +603,18 @@ export default function DashboardView() {
         // Extract data rows
         const extractedData = [];
         const dataStartRow = startRow === 0 ? 1 : startRow;
-        for (let row = dataStartRow; row <= endRow; row++) {
+        for (let row = dataStartRow; row <= Math.min(endRow, data.length - 1); row++) {
           if (!data[row]) continue;
           
           const rowData = [];
-          for (let col = startCol; col <= endCol; col++) {
+          for (let col = startCol; col <= Math.min(endCol, data[row].length - 1); col++) {
             rowData.push(data[row][col] || '');
           }
           extractedData.push(rowData);
         }
         
         console.log("Extracted data using range:", { headers, data: extractedData });
-        return {
-          headers,
-          data: extractedData
-        };
+        return { headers, data: extractedData };
       }
       
       // If we have columns but no range
@@ -635,7 +650,7 @@ export default function DashboardView() {
       }
       
       // Otherwise return all data
-      console.log("Returning all data");
+      console.log("Returning all data, rows:", data.length);
       return {
         headers: data[0] || [],
         data: data.slice(1) || []
@@ -767,6 +782,166 @@ export default function DashboardView() {
     }
   };
 
+  // Add this function to the DashboardView component, right after the refreshChart function
+  const refreshAllCharts = async () => {
+    if (!dashboard || !dashboard.items || dashboard.items.length === 0) {
+      alert("No charts to refresh");
+      return;
+    }
+    
+    setIsLoading(true);
+    try {
+      console.log("Refreshing all charts on dashboard");
+      
+      // Create an array of promises for refreshing each chart
+      const chartItems = dashboard.items.filter(item => 
+        item.type === 'chart' && item.sourceInfo && item.sourceInfo.spreadsheetId
+      );
+      
+      if (chartItems.length === 0) {
+        alert("No charts with data sources to refresh");
+        setIsLoading(false);
+        return;
+      }
+      
+      // Show loading state
+      alert(`Refreshing ${chartItems.length} charts...`);
+      
+      // Refresh each chart sequentially
+      let updatedItems = [...dashboard.items];
+      
+      for (const item of chartItems) {
+        // Fetch latest data for this chart
+        const latestData = await fetchLatestChartData(item.sourceInfo);
+        
+        if (!latestData) {
+          console.error(`Could not fetch latest data for chart: ${item.id}`);
+          continue;
+        }
+        
+        // Get the chart instance
+        const chartInstance = chartInstances.current[item.id];
+        if (!chartInstance) {
+          console.error(`Chart instance not found: ${item.id}`);
+          continue;
+        }
+        
+        // Update chart with new data
+        const chartType = item.chartConfig.type;
+        
+        // Clear existing datasets
+        chartInstance.data.datasets = [];
+        
+        if (['pie', 'doughnut', 'polarArea'].includes(chartType)) {
+          // Update labels
+          chartInstance.data.labels = latestData.data.map(row => String(row[0] || ''));
+          
+          // Update dataset
+          const dataValues = latestData.data.map(row => 
+            typeof row[1] === 'number' ? row[1] : parseFloat(row[1]) || 0
+          );
+          
+          // Generate colors
+          const colors = chartInstance.data.labels.map((_, index) => {
+            const hue = (index * 137.5) % 360;
+            return `hsla(${hue}, 70%, 60%, 0.7)`;
+          });
+          
+          chartInstance.data.datasets.push({
+            data: dataValues,
+            backgroundColor: colors,
+            borderColor: colors.map(color => color.replace('0.7)', '1)')),
+            borderWidth: 1
+          });
+        } else {
+          // For bar, line, etc charts
+          if (latestData.headers && latestData.headers.length > 0) {
+            chartInstance.data.labels = latestData.headers.slice(1);
+          }
+          
+          // Create datasets from data rows
+          latestData.data.forEach((row, index) => {
+            const hue = (index * 137.5) % 360;
+            const color = `hsla(${hue}, 70%, 60%, 0.7)`;
+            
+            chartInstance.data.datasets.push({
+              label: row[0] || `Series ${index + 1}`,
+              data: row.slice(1).map(val => 
+                typeof val === 'number' ? val : parseFloat(val) || 0
+              ),
+              backgroundColor: color,
+              borderColor: color.replace('0.7)', '1)'),
+              borderWidth: 1
+            });
+          });
+        }
+        
+        // Update the chart
+        chartInstance.update();
+        
+        // Update the item in our local array
+        updatedItems = updatedItems.map(i => {
+          if (i.id === item.id) {
+            return {
+              ...i,
+              sourceInfo: {
+                ...i.sourceInfo,
+                lastUpdated: new Date().toISOString()
+              }
+            };
+          }
+          return i;
+        });
+      }
+      
+      // Update dashboard state with all updated items
+      setDashboard({
+        ...dashboard,
+        items: updatedItems
+      });
+      
+      // Save all updates to Firestore
+      const dashboardRef = doc(db, 'dashboards', dashboard.id);
+      await updateDoc(dashboardRef, {
+        items: sanitizeForFirestore(updatedItems),
+        lastModified: serverTimestamp()
+      });
+      
+      console.log("All charts refreshed successfully");
+      alert("All charts refreshed with latest data");
+    } catch (error) {
+      console.error("Error refreshing charts:", error);
+      alert("Failed to refresh some charts");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Add this effect for auto-refresh functionality
+  useEffect(() => {
+    // Clear any existing timer
+    if (autoRefreshTimerRef.current) {
+      clearInterval(autoRefreshTimerRef.current);
+      autoRefreshTimerRef.current = null;
+    }
+    
+    // Set up new timer if auto-refresh is enabled
+    if (autoRefresh && dashboard) {
+      console.log(`Setting up auto-refresh every ${refreshInterval} seconds`);
+      autoRefreshTimerRef.current = setInterval(() => {
+        console.log("Auto-refreshing dashboard...");
+        refreshAllCharts();
+      }, refreshInterval * 1000);
+    }
+    
+    // Clean up on unmount
+    return () => {
+      if (autoRefreshTimerRef.current) {
+        clearInterval(autoRefreshTimerRef.current);
+      }
+    };
+  }, [autoRefresh, refreshInterval, dashboard?.id]);
+
   if (loading || isLoading) {
     return (
       <div className={styles.loadingContainer}>
@@ -803,6 +978,48 @@ export default function DashboardView() {
       <header className={styles.header}>
         <h1>{dashboard.title || 'Untitled Dashboard'}</h1>
         <div className={styles.headerActions}>
+          <div className={styles.refreshControls}>
+            <button 
+              className={`${styles.actionButton} ${styles.refreshAllButton}`}
+              onClick={refreshAllCharts}
+              disabled={isLoading}
+            >
+              {isLoading ? (
+                <div className={styles.spinnerSmall}></div>
+              ) : (
+                <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                  <path d="M8 3a5 5 0 1 0 4.546 2.914.5.5 0 0 1 .908-.417A6 6 0 1 1 8 2v1z"/>
+                  <path d="M8 4.466V.534a.25.25 0 0 1 .41-.192l2.36 1.966c.12.1.12.284 0 .384L8.41 4.658A.25.25 0 0 1 8 4.466z"/>
+                </svg>
+              )}
+              Refresh All Charts
+            </button>
+            
+            <div className={styles.autoRefreshControl}>
+              <label className={styles.autoRefreshToggle}>
+                <input
+                  type="checkbox"
+                  checked={autoRefresh}
+                  onChange={(e) => setAutoRefresh(e.target.checked)}
+                />
+                <span>Auto-refresh</span>
+              </label>
+              
+              {autoRefresh && (
+                <select 
+                  value={refreshInterval}
+                  onChange={(e) => setRefreshInterval(Number(e.target.value))}
+                  className={styles.refreshIntervalSelect}
+                >
+                  <option value="30">30 seconds</option>
+                  <option value="60">1 minute</option>
+                  <option value="300">5 minutes</option>
+                  <option value="600">10 minutes</option>
+                </select>
+              )}
+            </div>
+          </div>
+          
           <button 
             className={styles.saveButton}
             onClick={saveLayout}

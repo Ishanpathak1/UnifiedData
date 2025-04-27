@@ -458,3 +458,66 @@
   padding: 2px 4px;
   border-radius: 4px;
 }
+
+.refreshControls {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-right: 1rem;
+}
+
+.refreshAllButton {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  background-color: #f0f0f0;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: all 0.2s;
+}
+
+.refreshAllButton:hover {
+  background-color: #e0e0e0;
+}
+
+.refreshAllButton:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.autoRefreshControl {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.autoRefreshToggle {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  cursor: pointer;
+  user-select: none;
+}
+
+.refreshIntervalSelect {
+  padding: 0.3rem;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 0.8rem;
+}
+
+.spinnerSmall {
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(0, 0, 0, 0.1);
+  border-top-color: #333;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
