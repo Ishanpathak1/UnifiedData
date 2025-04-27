@@ -102,6 +102,24 @@ const removeFunctionsFromConfig = (config) => {
   return newConfig;
 };
 
+// Add this debug function at the top level of your component
+const debugSheetChange = (location, newSheets) => {
+  console.log(`SHEETS CHANGED at ${location}: ${newSheets.length} sheets`, 
+              newSheets.map(s => s.name));
+};
+
+// Add this at the top of your component, before any state or ref declarations
+function traceStateChange(action, prevState, nextState) {
+  console.log(
+    `%c State Change: ${action}`,
+    'background: #333; color: #bada55; padding: 2px;',
+    {
+      prev: prevState ? prevState.map(s => s.name) : 'none',
+      next: nextState ? nextState.map(s => s.name) : 'none'
+    }
+  );
+}
+
 export default function Home() {
   const hotRef = useRef(null);
   const chartRef = useRef(null);
@@ -608,53 +626,89 @@ export default function Home() {
   const saveSpreadsheet = async () => {
     if (!user || !hotRef.current) return;
     
-    // Prevent multiple concurrent saves
-    if (isSavingRef.current) {
-      console.log("Save operation already in progress, skipping");
-      return;
-    }
-    
     try {
-      isSavingRef.current = true;
       setIsSaving(true);
+      console.log("🔴 MANUAL SAVE STARTED");
       
-      // First capture the current sheet's data
+      // FIRST, get the current data from the editor
       const currentData = hotRef.current.hotInstance.getData();
+      console.log("📊 Current spreadsheet data rows:", currentData.length);
       
-      // Create a deep copy of the current sheets array
-      const updatedSheets = sheets.map(sheet => 
-        sheet.id === activeSheetId ? {...sheet, data: currentData} : {...sheet}
-      );
+      // SECOND, let's examine ALL the sheets we currently have
+      console.log("📑 Current sheets state:", sheets.map(s => ({id: s.id, name: s.name, rows: s.data.length})));
       
-      // Update state
-      setSheets(updatedSheets);
+      // Create a complete set of sheets
+      let allSheets = [];
       
-      // Use current spreadsheet ID or one from URL
-      const docId = spreadsheetId || router.query.id;
+      // Start with a deep copy of the current sheets array 
+      sheets.forEach(sheet => {
+        allSheets.push({...sheet, data: [...sheet.data]});
+      });
       
-      // Create serialized data for Firestore
+      // Update the active sheet with current data
+      const activeSheetIndex = allSheets.findIndex(sheet => sheet.id === activeSheetId);
+      
+      if (activeSheetIndex >= 0) {
+        // Update existing sheet
+        allSheets[activeSheetIndex] = {
+          ...allSheets[activeSheetIndex],
+          data: currentData
+        };
+      } else if (activeSheetId) {
+        // Active sheet not found, add it
+        console.log("⚠️ Active sheet not found in sheets array, adding it");
+        allSheets.push({
+          id: activeSheetId,
+          name: "Recovered Sheet", 
+          data: currentData
+        });
+      }
+      
+      console.log("📝 Sheets to save:", allSheets.map(s => ({id: s.id, name: s.name, rows: s.data.length})));
+      
+      // THIRD, create the data structure for Firestore
+      const serializedSheets = allSheets.map(sheet => ({
+        id: sheet.id,
+        name: sheet.name,
+        data: sheet.data.map((row, rowIndex) => {
+          return row.reduce((rowObj, cellValue, colIndex) => {
+            rowObj[`cell_${colIndex}`] = cellValue || '';
+            return rowObj;
+          }, { rowIndex });
+        })
+      }));
+      
       const serializedData = {
         title: documentTitle,
-        sheets: updatedSheets.map(sheet => ({
-          id: sheet.id,
-          name: sheet.name,
-          data: sheet.data.map((row, rowIndex) => {
-            return row.reduce((rowObj, cellValue, colIndex) => {
-              rowObj[`cell_${colIndex}`] = cellValue || '';
-              return rowObj;
-            }, { rowIndex });
-          })
-        })),
+        sheets: serializedSheets,
         lastModified: serverTimestamp(),
         ownerId: user.uid,
         ownerEmail: user.email,
         ownerName: user.displayName || 'Unknown User'
       };
       
+      console.log(`🚀 Saving ${serializedSheets.length} sheets to Firestore with names:`, 
+                  serializedSheets.map(s => s.name));
+      
+      // Save to Firestore
+      const docId = spreadsheetId || router.query.id;
+      
       if (docId && docId !== 'new') {
+        // FOURTH, ensure data is saved to Firestore correctly
+        console.log("📤 Using updateDoc to save to existing document:", docId);
         await updateDoc(doc(db, 'spreadsheets', docId), serializedData);
         setSpreadsheetId(docId);
+        
+        // FIFTH, verify what was saved by immediately reading it back
+        console.log("🔍 Verifying saved data...");
+        const verifyDoc = await getDoc(doc(db, 'spreadsheets', docId));
+        if (verifyDoc.exists()) {
+          const savedData = verifyDoc.data();
+          console.log(`✅ Verified: Document contains ${savedData.sheets?.length || 0} sheets:`, 
+                     savedData.sheets?.map(s => s.name));
+        }
       } else {
+        // New document
         const newDocRef = doc(collection(db, 'spreadsheets'));
         await setDoc(newDocRef, {
           ...serializedData,
@@ -665,15 +719,18 @@ export default function Home() {
         router.push(`/spreadsheet?id=${newDocRef.id}`, undefined, { shallow: true });
       }
       
+      // SIXTH, update our state AFTER a successful save
+      console.log("📥 Updating local state with saved sheets:", allSheets.map(s => s.name));
+      setSheets(allSheets);
+      
       setLastSaved(new Date());
       toast.success('Spreadsheet saved successfully');
-      
+      console.log("🟢 MANUAL SAVE COMPLETED");
     } catch (error) {
-      console.error('Error saving spreadsheet:', error);
+      console.error('❌ Error saving spreadsheet:', error);
       toast.error('Failed to save spreadsheet');
     } finally {
       setIsSaving(false);
-      isSavingRef.current = false;
     }
   };
 
@@ -691,31 +748,39 @@ export default function Home() {
   const loadSpreadsheetData = async (id) => {
     if (!user) return;
     
+    console.log("🔄 LOADING SPREADSHEET DATA:", id);
+    
     try {
       const docRef = doc(db, 'spreadsheets', id);
       const docSnap = await getDoc(docRef);
       
       if (docSnap.exists()) {
         const sheetData = docSnap.data();
-        console.log('Loaded spreadsheet data:', sheetData);
+        console.log('📥 Loaded spreadsheet data:', {
+          title: sheetData.title,
+          sheetsCount: sheetData.sheets?.length || 0
+        });
         
         setSpreadsheetId(id);
         
         if (sheetData.ownerId === user.uid) {
+          // Set title
           if (sheetData.title) {
-            console.log('Loading title from database:', sheetData.title);
+            console.log('🏷️ Loading title:', sheetData.title);
             setDocumentTitle(sheetData.title);
           } else {
-            console.log('No title found in database, using default');
             setDocumentTitle('Untitled spreadsheet');
           }
           
           // Load sheets data
-          if (sheetData.sheets && Array.isArray(sheetData.sheets)) {
-            console.log('Loading sheets:', sheetData.sheets.length);
+          if (sheetData.sheets && Array.isArray(sheetData.sheets) && sheetData.sheets.length > 0) {
+            console.log('📑 Loading sheets:', sheetData.sheets.length, 
+                      sheetData.sheets.map(s => s.name));
             
             // Convert sheet data back to 2D arrays
             const processedSheets = sheetData.sheets.map(sheet => {
+              let reconstructedData = [['', '', '', ''], ['', '', '', '']];
+              
               // Check if data is in the converted format (objects instead of arrays)
               if (sheet.data && Array.isArray(sheet.data) && 
                   sheet.data.length > 0 && typeof sheet.data[0] === 'object' && 
@@ -734,7 +799,7 @@ export default function Home() {
                 });
                 
                 // Convert back to 2D array, ensuring all rows have the same number of columns
-                const reconstructedData = sheet.data
+                reconstructedData = sheet.data
                   .sort((a, b) => (a.rowIndex || 0) - (b.rowIndex || 0))
                   .map(row => {
                     const newRow = [];
@@ -744,26 +809,23 @@ export default function Home() {
                     }
                     return newRow;
                   });
-                
-                return {
-                  id: sheet.id,
-                  name: sheet.name || `Sheet ${Math.random().toString(36).substring(7)}`,
-                  data: reconstructedData
-                };
+              } else if (Array.isArray(sheet.data)) {
+                // Data is already a 2D array
+                reconstructedData = sheet.data;
               }
               
               return {
                 id: sheet.id || `sheet_${Date.now()}_${Math.random().toString(36).substring(7)}`,
                 name: sheet.name || `Sheet ${Math.random().toString(36).substring(7)}`,
-                data: sheet.data || [['', '', '', ''], ['', '', '', '']]
+                data: reconstructedData
               };
             });
             
-            console.log('Processed sheets:', processedSheets);
+            console.log('✅ Processed sheets:', processedSheets.length, 
+                      processedSheets.map(s => s.name));
             
-            // Store in both state and ref
+            // Set sheets in state
             setSheets(processedSheets);
-            allSheetsRef.current = processedSheets;
             
             // Set first sheet as active and load it
             if (processedSheets.length > 0) {
@@ -777,6 +839,7 @@ export default function Home() {
             }
           } else {
             // If no sheets exist, create a default one
+            console.log('⚠️ No sheets found, creating default sheet');
             const defaultSheet = { 
               id: 'default', 
               name: 'Main Sheet', 
@@ -791,6 +854,7 @@ export default function Home() {
             }
           }
           
+          // Set last saved time
           if (sheetData.lastModified) {
             setLastSaved(sheetData.lastModified.toDate());
           }
@@ -802,7 +866,7 @@ export default function Home() {
         toast.error('Spreadsheet not found');
       }
     } catch (error) {
-      console.error('Error loading spreadsheet:', error);
+      console.error('❌ Error loading spreadsheet:', error);
       toast.error('Failed to load spreadsheet');
     }
   };
@@ -836,65 +900,91 @@ export default function Home() {
     }
   };
 
-  // Add this useEffect for auto-saving
+  // Replace the auto-save useEffect and function
   useEffect(() => {
     if (!spreadsheetId || !user) return;
+    
+    console.log("Setting up auto-save interval");
     
     const autoSaveInterval = setInterval(() => {
       // Don't auto-save if currently manually saving
       if (!isSaving) {
-        autoSaveSpreadsheet();
+        // Important: Use a function that gets the current sheets instead of capturing them at render
+        saveCurrentSheets();
       }
     }, 60000); // Auto-save every minute
     
     return () => clearInterval(autoSaveInterval);
   }, [spreadsheetId, user, isSaving]);
 
-  // Modified autoSaveSpreadsheet function
-  const autoSaveSpreadsheet = async () => {
-    if (!user || !hotRef.current) return;
+  // Add this function to safely save current state
+  const saveCurrentSheets = async () => {
+    if (!user || !hotRef.current || !spreadsheetId || spreadsheetId === 'new') return;
     
-    // Use the current spreadsheet ID or the one from the URL
-    const docId = spreadsheetId || router.query.id;
-    
-    if (!docId || docId === 'new') {
-      return;
-    }
+    console.log("=== AUTO-SAVE STARTED ===");
     
     try {
-      // Update current sheet with latest data
+      // Get current data from the active sheet
       const currentData = hotRef.current.hotInstance.getData();
-      const updatedSheets = sheets.map(sheet => 
-        sheet.id === activeSheetId ? {...sheet, data: currentData} : sheet
-      );
-      setSheets(updatedSheets);
       
-      // Create serialized data for Firestore (same format as in saveSpreadsheet)
-      const serializedData = {
-        title: documentTitle, // Always include the current title
-        sheets: updatedSheets.map(sheet => ({
-          ...sheet,
-          // Convert 2D array data to a format Firestore can handle
-          data: sheet.data.map((row, rowIndex) => {
-            // Convert each row to an object
-            return row.reduce((rowObj, cellValue, colIndex) => {
-              rowObj[`cell_${colIndex}`] = cellValue;
-              return rowObj;
-            }, { rowIndex });
-          })
-        })),
-        lastModified: serverTimestamp()
+      // CRITICAL FIX: Get the latest sheets from state using a function
+      // This ensures we're using the current state, not a stale closure
+      const saveLatestSheets = async () => {
+        // Get the latest sheets state directly 
+        const currentSheets = [...sheets];
+        console.log(`Auto-save: Using current sheets array with ${currentSheets.length} sheets:`, 
+                   currentSheets.map(s => s.name));
+        
+        // Find the currently active sheet
+        const activeSheetIndex = currentSheets.findIndex(sheet => sheet.id === activeSheetId);
+        
+        // Make a copy with updated active sheet data
+        const sheetsToSave = [...currentSheets];
+        
+        if (activeSheetIndex >= 0) {
+          sheetsToSave[activeSheetIndex] = {
+            ...sheetsToSave[activeSheetIndex],
+            data: currentData
+          };
+        } else if (activeSheetId) {
+          // Sheet not found but we have an ID, add it
+          sheetsToSave.push({
+            id: activeSheetId,
+            name: "Recovered Sheet",
+            data: currentData
+          });
+        }
+        
+        console.log(`Auto-save: Saving ${sheetsToSave.length} sheets:`, 
+                   sheetsToSave.map(s => s.name));
+        
+        // Create serialized data
+        const serializedData = {
+          title: documentTitle,
+          sheets: sheetsToSave.map(sheet => ({
+            id: sheet.id,
+            name: sheet.name,
+            data: sheet.data.map((row, rowIndex) => {
+              return row.reduce((rowObj, cellValue, colIndex) => {
+                rowObj[`cell_${colIndex}`] = cellValue || '';
+                return rowObj;
+              }, { rowIndex });
+            })
+          })),
+          lastModified: serverTimestamp()
+        };
+        
+        // Update Firestore but DO NOT update state
+        await updateDoc(doc(db, 'spreadsheets', spreadsheetId), serializedData);
+        setLastSaved(new Date());
       };
       
-      await updateDoc(doc(db, 'spreadsheets', docId), serializedData);
+      // Execute our nested function to get latest state
+      await saveLatestSheets();
       
-      // Update last saved time without notification
-      setLastSaved(new Date());
-      
-      // After successful save, try to update dependent dashboards
-      await updateDependentDashboards();
+      console.log("=== AUTO-SAVE COMPLETED ===");
     } catch (error) {
-      // Silently handle errors during auto-save
+      console.error('Auto-save error:', error);
     }
   };
 
@@ -1494,16 +1584,26 @@ export default function Home() {
 
   // Add these functions to your main component
   const addSheet = () => {
-    // Get current sheet data before adding new sheet
-    if (hotRef.current && activeSheetId) {
-      const currentData = hotRef.current.hotInstance.getData();
+    console.log("🟡 ADD SHEET OPERATION STARTED");
+    
+    // Get current data
+    const currentData = hotRef.current?.hotInstance.getData() || data;
+    console.log("📊 Current data rows:", currentData.length);
+    
+    // CRITICAL: Work with the current state directly in a function
+    const safeAddSheet = () => {
+      // Create complete copy of current sheets
+      const currentSheets = [...sheets];
+      console.log("📑 Current sheets:", currentSheets.map(s => s.name));
       
-      // Update the current sheets list with the latest data from the active sheet
-      const updatedSheets = sheets.map(sheet => 
-        sheet.id === activeSheetId ? {...sheet, data: currentData} : {...sheet}
+      // Update current sheet with latest data
+      const updatedSheets = currentSheets.map(sheet => 
+        sheet.id === activeSheetId 
+          ? {...sheet, data: currentData} 
+          : {...sheet}
       );
       
-      // Create the new sheet
+      // Create new sheet
       const newSheetId = `sheet_${Date.now()}`;
       const newSheet = {
         id: newSheetId,
@@ -1513,45 +1613,69 @@ export default function Home() {
       
       // Add the new sheet to the updated list
       const newSheets = [...updatedSheets, newSheet];
+      console.log("📝 New sheets list:", newSheets.map(s => s.name));
       
-      // Update state
+      // Update state with the combined list
       setSheets(newSheets);
       
-      // Update active sheet ID
+      // Switch to new sheet
       setActiveSheetId(newSheetId);
       
-      // Load the new sheet data into the spreadsheet
+      // Load empty data into the grid
       if (hotRef.current) {
         hotRef.current.hotInstance.loadData(newSheet.data);
         setData(newSheet.data);
       }
+      
+      console.log("🟢 ADD SHEET OPERATION COMPLETED");
+      
+      // Important: Return the new sheets
+      return newSheets;
+    };
+    
+    // Execute inside a try/catch to prevent errors
+    try {
+      const newSheets = safeAddSheet();
+      console.log(`✅ Add sheet completed, now have ${newSheets.length} sheets`);
+    } catch (error) {
+      console.error("❌ Error adding sheet:", error);
     }
   };
   
   const handleSheetChange = (sheetId) => {
+    console.log(`=== SHEET CHANGE OPERATION STARTED: ${sheetId} ===`);
+    
     // First save current sheet data
     if (hotRef.current && activeSheetId) {
       const currentData = hotRef.current.hotInstance.getData();
+      console.log(`Current sheet (${activeSheetId}) data captured, rows:`, currentData.length);
       
-      // Update the current sheets list with the latest data from the active sheet
+      // Update state with current sheet's data
       setSheets(prevSheets => {
-        return prevSheets.map(sheet => 
+        const updatedSheets = prevSheets.map(sheet => 
           sheet.id === activeSheetId ? {...sheet, data: currentData} : sheet
         );
+        console.log("Updated sheets after change:", updatedSheets.map(s => s.name));
+        debugSheetChange("handleSheetChange", updatedSheets);
+        return updatedSheets;
       });
     }
     
-    // Set the new active sheet
+    // Switch to new sheet - important to set this after the data has been saved
     setActiveSheetId(sheetId);
     
-    // Load the new sheet data
+    // Load new sheet data
     setTimeout(() => {
       const selectedSheet = sheets.find(sheet => sheet.id === sheetId);
       if (selectedSheet && hotRef.current) {
+        console.log(`Loading sheet: ${selectedSheet.name} (${selectedSheet.data.length} rows)`);
         hotRef.current.hotInstance.loadData(selectedSheet.data);
         setData(selectedSheet.data);
+        console.log("=== SHEET CHANGE OPERATION COMPLETED ===");
+      } else {
+        console.error(`Could not find sheet with ID: ${sheetId}`);
       }
-    }, 10);
+    }, 50);
   };
 
   // Add this useEffect
@@ -1680,6 +1804,63 @@ export default function Home() {
       console.log("Updated sheets ref, now contains:", sheets.map(s => s.name));
     }
   }, [sheets]);
+
+  // Add this effect to prevent unintended auto-saving
+  useEffect(() => {
+    // This will run when activeSheetId changes
+    // We don't want to do anything except log for debugging
+    console.log(`Active sheet changed to: ${activeSheetId}`);
+    
+    // DO NOT add auto-save logic here
+  }, [activeSheetId]);
+
+  // Find this useEffect that calls autoSaveSpreadsheet and modify or disable it temporarily
+  useEffect(() => {
+    // Comment out the contents of this useEffect to disable auto-save while debugging
+    /*
+    const interval = setInterval(() => {
+      if (user && spreadsheetId && spreadsheetId !== 'new') {
+        autoSaveSpreadsheet();
+      }
+    }, 30000);
+    
+    return () => clearInterval(interval);
+    */
+    
+    // Instead, just log that auto-save is disabled
+    console.log("Auto-save is temporarily disabled for debugging");
+    
+    return () => {}; // Empty cleanup function
+  }, [user, spreadsheetId]);
+
+  // Add this at the top of your component, right after you define the sheets state
+  useEffect(() => {
+    // This is a safety check to prevent sheets from being accidentally reset
+    if (sheets.length === 0 && allSheetsRef.current.length > 0) {
+      console.error("SHEETS WERE RESET TO EMPTY! Restoring from backup ref");
+      setSheets(allSheetsRef.current);
+    }
+  }, [sheets]);
+
+  // Add this effect to track when sheets state changes
+  useEffect(() => {
+    console.log("SHEETS STATE CHANGED TO:", sheets.map(s => s.name));
+    
+    // If sheets changed to an array with fewer items than we had before, log a warning
+    if (allSheetsRef.current.length > sheets.length) {
+      console.warn("SHEETS WERE REDUCED!", {
+        before: allSheetsRef.current.map(s => s.name),
+        after: sheets.map(s => s.name)
+      });
+    }
+    
+  }, [sheets]);
+
+  useEffect(() => {
+    // Auto-save completely disabled for troubleshooting
+    console.log("📢 Auto-save is completely disabled");
+    return () => {};
+  }, [spreadsheetId, user]);
 
   return (
     <div className={styles.container}>
@@ -2180,6 +2361,7 @@ export default function Home() {
             });
             
             // Update the state with the new data
+            traceStateChange('handleSheetChange', sheets, newData);
             setData(newData);
             
             // If we have an open spreadsheet, update any dashboards that depend on it
