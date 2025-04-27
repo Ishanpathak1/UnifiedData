@@ -17,25 +17,41 @@ const ResponsiveGridLayout = WidthProvider(Responsive);
 // Add this helper function at the top of your component (or outside it)
 const sanitizeForFirestore = (obj) => {
   if (obj === null || obj === undefined) {
-    return null;
-  }
-  
-  if (typeof obj !== 'object') {
     return obj;
   }
   
+  // Handle arrays specially - check if array contains objects that need sanitizing
   if (Array.isArray(obj)) {
-    return obj.map(item => sanitizeForFirestore(item)).filter(item => item !== undefined);
+    // If array contains only primitives, return as is
+    if (obj.every(item => item === null || item === undefined || 
+        typeof item === 'string' || typeof item === 'number' || 
+        typeof item === 'boolean')) {
+      return obj;
+    }
+    
+    // Otherwise, sanitize each element
+    return obj.map(item => sanitizeForFirestore(item));
   }
   
-  const newObj = {};
-  Object.keys(obj).forEach(key => {
-    if (obj[key] !== undefined) {
-      newObj[key] = sanitizeForFirestore(obj[key]);
-    }
-  });
+  // Handle Date objects
+  if (obj instanceof Date) {
+    return serverTimestamp();
+  }
   
-  return newObj;
+  // Handle plain objects
+  if (typeof obj === 'object') {
+    const newObj = {};
+    Object.keys(obj).forEach(key => {
+      // Skip undefined values
+      if (obj[key] !== undefined) {
+        newObj[key] = sanitizeForFirestore(obj[key]);
+      }
+    });
+    return newObj;
+  }
+  
+  // Return primitives as is
+  return obj;
 };
 
 export default function DashboardView() {
@@ -71,17 +87,49 @@ export default function DashboardView() {
         const docSnap = await getDoc(docRef);
         
         if (docSnap.exists()) {
-          const data = docSnap.data();
-          if (data.ownerId === user.uid) {
-            console.log("Dashboard data:", data);
+          const dashboardData = docSnap.data();
+          if (dashboardData.ownerId === user.uid) {
+            console.log("Dashboard data:", dashboardData);
+            
+            // Convert items object back to array if needed
+            if (dashboardData.items && typeof dashboardData.items === 'object' && !Array.isArray(dashboardData.items)) {
+              // Get keys that look like "_0", "_1", etc. and sort them
+              const itemKeys = Object.keys(dashboardData.items)
+                .filter(key => key.startsWith('_'))
+                .sort((a, b) => {
+                  const numA = parseInt(a.substring(1));
+                  const numB = parseInt(b.substring(1));
+                  return numA - numB;
+                });
+                
+              // Create a proper array from the object
+              dashboardData.items = itemKeys.map(key => {
+                const item = dashboardData.items[key];
+                
+                // Also check if item.chartConfig.data.datasets is an object and convert it
+                if (item.chartConfig?.data?.datasets && 
+                    typeof item.chartConfig.data.datasets === 'object' && 
+                    !Array.isArray(item.chartConfig.data.datasets)) {
+                  
+                  const datasetKeys = Object.keys(item.chartConfig.data.datasets)
+                    .filter(key => key.startsWith('_'))
+                    .sort((a, b) => parseInt(a.substring(1)) - parseInt(b.substring(1)));
+                    
+                  item.chartConfig.data.datasets = datasetKeys.map(k => item.chartConfig.data.datasets[k]);
+                }
+                
+                return item;
+              });
+            }
+            
             setDashboard({
               id: docSnap.id,
-              ...data
+              ...dashboardData
             });
             
             // Initialize layout from saved positions
-            if (data.items && data.items.length > 0) {
-              const initialLayout = data.items.map((item, index) => ({
+            if (dashboardData.items && dashboardData.items.length > 0) {
+              const initialLayout = dashboardData.items.map((item, index) => ({
                 i: item.id,
                 x: item.position?.x ?? (index % 3) * 4,
                 y: item.position?.y ?? Math.floor(index / 3) * 4,
@@ -312,7 +360,7 @@ export default function DashboardView() {
   useEffect(() => {
     if (!dashboard || !dashboard.items || !mounted) return;
     
-    // Give time for layout to settle
+    // Give time for layout to settle and refs to be created
     const timer = setTimeout(async () => {
       // Process each chart
       for (const item of dashboard.items) {
@@ -320,9 +368,30 @@ export default function DashboardView() {
         
         const canvasRef = chartRefs.current[item.id];
         if (!canvasRef) {
-          console.error("Canvas ref not found for chart:", item.id);
+          console.log(`Canvas ref not found for chart: ${item.id}, will retry later`);
+          
+          // Instead of continuing, let's retry after a short delay
+          // This gives time for the DOM to fully render
+          setTimeout(() => {
+            if (chartRefs.current[item.id]) {
+              console.log(`Retry succeeded for chart: ${item.id}`);
+              initializeChart(item);
+            }
+          }, 500);
+          
           continue;
         }
+        
+        initializeChart(item);
+      }
+    }, 300);
+    
+    // Helper function to initialize a chart
+    const initializeChart = async (item) => {
+      try {
+        console.log("Rendering chart:", item.id, item.title);
+        const canvasRef = chartRefs.current[item.id];
+        const ctx = canvasRef.getContext('2d');
         
         // Destroy existing chart if there is one
         if (chartInstances.current[item.id]) {
@@ -334,37 +403,32 @@ export default function DashboardView() {
           delete chartInstances.current[item.id];
         }
         
-        try {
-          console.log("Rendering chart:", item.id, item.title);
-          const ctx = canvasRef.getContext('2d');
-          
-          // Prepare the chart configuration
-          const chartConfig = prepareChartConfig(item.chartConfig);
-          if (!chartConfig) {
-            console.error("Could not prepare chart config for:", item.id);
-            continue;
-          }
-          
-          // If source info exists, try to fetch the latest data
-          if (item.sourceInfo && item.sourceInfo.spreadsheetId) {
-            const latestData = await fetchLatestChartData(item.sourceInfo);
-            
-            if (latestData) {
-              console.log("Fetched latest data for chart:", item.id, latestData);
-              
-              // Update the chart config with this latest data
-              updateChartWithLatestData(chartConfig, latestData, item.chartConfig.type);
-            }
-          }
-          
-          // Create chart using the updated configuration
-          chartInstances.current[item.id] = new Chart(ctx, chartConfig);
-          console.log("Chart rendered successfully:", item.id);
-        } catch (error) {
-          console.error("Error creating chart:", error, item.chartConfig);
+        // Prepare the chart configuration
+        const chartConfig = prepareChartConfig(item.chartConfig);
+        if (!chartConfig) {
+          console.error("Could not prepare chart config for:", item.id);
+          return;
         }
+        
+        // If source info exists, try to fetch the latest data
+        if (item.sourceInfo && item.sourceInfo.spreadsheetId) {
+          const latestData = await fetchLatestChartData(item.sourceInfo);
+          
+          if (latestData) {
+            console.log("Fetched latest data for chart:", item.id, latestData);
+            
+            // Update the chart config with this latest data
+            updateChartWithLatestData(chartConfig, latestData, item.chartConfig.type);
+          }
+        }
+        
+        // Create chart using the updated configuration
+        chartInstances.current[item.id] = new Chart(ctx, chartConfig);
+        console.log("Chart rendered successfully:", item.id);
+      } catch (error) {
+        console.error("Error creating chart:", error, item.chartConfig);
       }
-    }, 300);
+    };
     
     return () => clearTimeout(timer);
   }, [dashboard, mounted]);
@@ -436,26 +500,34 @@ export default function DashboardView() {
           break;
           
         case 'radar':
-          // For radar charts, use first column as labels, second as data
-          if (latestData.headers.length > 1) {
-            chartConfig.data.labels = latestData.data.map(row => String(row[0] || ''));
+          // For radar charts:
+          // - Labels should be column headers
+          // - Each row should be a single dataset
+          
+          // Clear existing labels and datasets
+          chartConfig.data.labels = latestData.headers.slice(1);
+          chartConfig.data.datasets = [];
+          
+          // Create one dataset per row of data
+          latestData.data.forEach((row, index) => {
+            if (!row || row.length <= 1) return;
             
-            // Make sure we have at least one dataset
-            if (chartConfig.data.datasets.length === 0) {
-              chartConfig.data.datasets.push({
-                label: latestData.headers[1] || 'Dataset 1',
-                data: [],
-                backgroundColor: 'rgba(255, 99, 132, 0.2)',
-                borderColor: 'rgba(255, 99, 132, 1)',
-                borderWidth: 1
-              });
-            }
+            const hue = (index * 137.5) % 360;
+            const color = `hsla(${hue}, 70%, 60%, 0.7)`;
+            const borderColor = `hsla(${hue}, 70%, 60%, 1)`;
             
-            // Update the dataset with the values from the second column
-            chartConfig.data.datasets[0].data = latestData.data.map(row => 
-              typeof row[1] === 'number' ? row[1] : parseFloat(row[1]) || 0
-            );
-          }
+            chartConfig.data.datasets.push({
+              label: row[0] || `Series ${index + 1}`,
+              data: row.slice(1).map(val => 
+                typeof val === 'number' ? val : parseFloat(val) || 0
+              ),
+              backgroundColor: color.replace('0.7', '0.2'),
+              borderColor: borderColor,
+              borderWidth: 2,
+              pointBackgroundColor: borderColor,
+              pointRadius: 3
+            });
+          });
           break;
           
         default:
@@ -545,7 +617,9 @@ export default function DashboardView() {
       }
       
       // Use the first sheet by default or find the specific one if needed
-      const sheet = spreadsheetData.sheets[0];
+      const sheet = sourceInfo.sheetId ? 
+        spreadsheetData.sheets.find(s => s.id === sourceInfo.sheetId) : 
+        spreadsheetData.sheets[0];
       
       // Convert the sheet data format to a 2D array
       let data = [];
@@ -614,7 +688,14 @@ export default function DashboardView() {
         }
         
         console.log("Extracted data using range:", { headers, data: extractedData });
-        return { headers, data: extractedData };
+        
+        // Ensure consistent data format between updateDependentDashboards and fetchLatestChartData
+        const formattedData = {
+          headers: extractedData[0] || [],
+          data: extractedData.slice(1) || []
+        };
+        
+        return formattedData;
       }
       
       // If we have columns but no range
@@ -643,18 +724,25 @@ export default function DashboardView() {
           data: extractedData 
         });
         
-        return {
-          headers: columnIndices.map(index => headers[index]),
-          data: extractedData
+        // Ensure consistent data format between updateDependentDashboards and fetchLatestChartData
+        const formattedData = {
+          headers: extractedData[0] || [],
+          data: extractedData.slice(1) || []
         };
+        
+        return formattedData;
       }
       
       // Otherwise return all data
       console.log("Returning all data, rows:", data.length);
-      return {
+      
+      // Ensure consistent data format between updateDependentDashboards and fetchLatestChartData
+      const formattedData = {
         headers: data[0] || [],
         data: data.slice(1) || []
       };
+      
+      return formattedData;
     } catch (error) {
       console.error("Error fetching latest chart data:", error);
       return null;

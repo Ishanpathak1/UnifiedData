@@ -28,7 +28,9 @@ import {
   getDoc, 
   setDoc, 
   updateDoc, 
-  serverTimestamp 
+  serverTimestamp, 
+  addDoc, 
+  onSnapshot 
 } from 'firebase/firestore';
 import { toast } from 'react-hot-toast';
 import { useAuth } from '../contexts/AuthContext';
@@ -119,6 +121,92 @@ function traceStateChange(action, prevState, nextState) {
     }
   );
 }
+
+// Add this component to your spreadsheet.js
+const SyncStatusIndicator = ({ spreadsheetId }) => {
+  const [syncStatus, setSyncStatus] = useState('idle'); // 'idle', 'in_progress', 'completed', 'error'
+  const [lastSyncTime, setLastSyncTime] = useState(null);
+  const [syncError, setSyncError] = useState(null);
+  
+  // Listen for changes to the sync status
+  useEffect(() => {
+    if (!spreadsheetId || spreadsheetId === 'new') return;
+    
+    // Set up a listener for sync status changes
+    const unsubscribe = onSnapshot(doc(db, 'spreadsheets', spreadsheetId), (doc) => {
+      if (doc.exists()) {
+        const data = doc.data();
+        
+        // Update sync status if it exists
+        if (data.syncStatus) {
+          setSyncStatus(data.syncStatus);
+          
+          // Handle completed syncs
+          if (data.syncStatus === 'completed' && data.lastSyncedAt) {
+            const syncTime = data.lastSyncedAt.toDate();
+            setLastSyncTime(syncTime);
+            localStorage.setItem('lastDashboardSync', syncTime.toISOString());
+          }
+          
+          // Handle errors
+          if (data.syncStatus === 'error' && data.syncError) {
+            setSyncError(data.syncError);
+          } else {
+            setSyncError(null);
+          }
+        }
+      }
+    });
+    
+    // Clean up listener on unmount
+    return () => unsubscribe();
+  }, [spreadsheetId]);
+  
+  // Only show if we have an active sync or recent completion
+  if (syncStatus === 'idle') {
+    return null;
+  }
+  
+  return (
+    <div className={`${styles.syncStatusIndicator} ${styles[syncStatus]}`}>
+      {syncStatus === 'in_progress' && (
+        <>
+          <div className={styles.syncSpinner}></div>
+          <span>Synchronizing dashboards...</span>
+        </>
+      )}
+      
+      {syncStatus === 'completed' && (
+        <>
+          <svg className={styles.syncCompleteIcon} xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+            <path d="M12.736 3.97a.733.733 0 0 1 1.047 0c.286.289.29.756.01 1.05L7.88 12.01a.733.733 0 0 1-1.065.02L3.217 8.384a.757.757 0 0 1 0-1.06.733.733 0 0 1 1.047 0l3.052 3.093 5.4-6.425a.247.247 0 0 1 .02-.022Z"/>
+          </svg>
+          <span>
+            Dashboards updated {lastSyncTime ? formatTimeAgo(lastSyncTime) : ''}
+          </span>
+        </>
+      )}
+      
+      {syncStatus === 'error' && (
+        <>
+          <svg className={styles.syncErrorIcon} xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+            <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14zm0-2A5 5 0 1 0 8 3a5 5 0 0 0 0 10z"/>
+            <path d="M7.002 11a1 1 0 1 1 2 0 1 1 0 0 1-2 0zM7.1 4.995a.905.905 0 1 1 1.8 0l-.35 3.507a.552.552 0 0 1-1.1 0L7.1 4.995z"/>
+          </svg>
+          <span>
+            Sync failed: {syncError || 'Unknown error'}
+          </span>
+          <button 
+            onClick={updateDependentDashboards}
+            className={styles.retrySyncButton}
+          >
+            Retry
+          </button>
+        </>
+      )}
+    </div>
+  );
+};
 
 export default function Home() {
   const hotRef = useRef(null);
@@ -662,36 +750,28 @@ export default function Home() {
   const saveAllSpreadsheetData = async () => {
     if (!user || !hotRef.current) return;
     
+    setIsSaving(true);
+    
     try {
-      setIsSaving(true);
       console.log("🔄 UNIFIED SAVE STARTED");
       
       // Get current editor data
       const currentData = hotRef.current.hotInstance.getData();
-      console.log("Current data from editor rows:", currentData.length);
       
-      // IMPORTANT: Debug the sheets arrays
-      console.log("Current sheets state:", sheets.map(s => s.name));
-      console.log("Current sheets ref:", allSheetsRef.current.map(s => s.name));
-      
-      // Get all sheets from allSheetsRef which should be more reliable
+      // Get all sheets
       const allSheets = allSheetsRef.current.length > 0 ? 
         JSON.parse(JSON.stringify(allSheetsRef.current)) : 
         JSON.parse(JSON.stringify(sheets));
-      
-      console.log("Working with sheets:", allSheets.map(s => s.name));
       
       // Update the active sheet with current grid data
       const activeIndex = allSheets.findIndex(s => s.id === activeSheetId);
       
       if (activeIndex >= 0) {
-        console.log(`Updating active sheet: ${allSheets[activeIndex].name}`);
         allSheets[activeIndex] = {
           ...allSheets[activeIndex],
           data: currentData
         };
       } else if (activeSheetId) {
-        console.log("Active sheet not found in sheets array, adding it");
         allSheets.push({
           id: activeSheetId,
           name: "New Sheet",
@@ -701,7 +781,6 @@ export default function Home() {
       
       // Handle empty sheets array as a safety check
       if (allSheets.length === 0) {
-        console.log("No sheets found, creating default sheet");
         const defaultSheet = {
           id: activeSheetId || 'default',
           name: 'Main Sheet',
@@ -709,8 +788,6 @@ export default function Home() {
         };
         allSheets.push(defaultSheet);
       }
-      
-      console.log(`Final sheets to save: ${allSheets.length}`, allSheets.map(s => s.name));
       
       // Create serialized data
       const serializedSheets = allSheets.map(sheet => ({
@@ -724,33 +801,94 @@ export default function Home() {
         })
       }));
       
+      // Get current version from Firestore or localStorage
+      let currentVersion = 1;
+      const docId = spreadsheetId || router.query.id;
+      
+      if (docId && docId !== 'new') {
+        // Try to get current version from localStorage first (faster)
+        const storedVersion = localStorage.getItem(`spreadsheet_${docId}_version`);
+        
+        if (storedVersion) {
+          currentVersion = parseInt(storedVersion) + 1;
+        } else {
+          // Fetch from Firestore if not in localStorage
+          const docRef = doc(db, 'spreadsheets', docId);
+          const docSnapshot = await getDoc(docRef);
+          
+          if (docSnapshot.exists() && docSnapshot.data().version) {
+            currentVersion = docSnapshot.data().version + 1;
+          }
+        }
+      }
+      
+      // Prepare spreadsheet data with versioning
       const spreadsheetData = {
         title: documentTitle,
         sheets: serializedSheets,
         lastModified: serverTimestamp(),
         ownerId: user.uid,
         ownerEmail: user.email,
-        ownerName: user.displayName || 'Unknown User'
+        ownerName: user.displayName || 'Unknown User',
+        version: currentVersion,
+        metadata: {
+          sheetCount: serializedSheets.length,
+          lastEditor: user.displayName || user.email,
+          saveSource: 'manual'
+        }
       };
       
-      console.log(`Saving ${serializedSheets.length} sheets to Firestore:`, 
-                 serializedSheets.map(s => s.name));
-      
       // Save to Firestore
-      const docId = spreadsheetId || router.query.id;
       if (docId && docId !== 'new') {
+        // Update existing document
         await updateDoc(doc(db, 'spreadsheets', docId), spreadsheetData);
         setSpreadsheetId(docId);
         
-        // Verify the save as a debug step
-        const verifyDoc = await getDoc(doc(db, 'spreadsheets', docId));
-        if (verifyDoc.exists()) {
-          const savedData = verifyDoc.data();
-          console.log(`Verified: Document contains ${savedData.sheets?.length || 0} sheets:`, 
-                     savedData.sheets?.map(s => s.name));
+        // Update localStorage version
+        localStorage.setItem(`spreadsheet_${docId}_version`, currentVersion.toString());
+        
+        // Update toast to show save success - FIXED THIS PART
+        toast.success("Spreadsheet saved successfully");
+        
+        // Update state after successful save
+        setSheets(allSheets);
+        allSheetsRef.current = JSON.parse(JSON.stringify(allSheets));
+        setLastSaved(new Date());
+        
+        // Check if we should update dashboards
+        const shouldUpdateDashboards = localStorage.getItem('autoDashboardSync') === 'true';
+        
+        if (shouldUpdateDashboards) {
+          // Allow the save toast to be seen briefly before showing the sync toast
+          setTimeout(async () => {
+            console.log("Automatically synchronizing dashboards after save...");
+            await updateDependentDashboards();
+          }, 1000);
+        } else {
+          // Check if there are dependent dashboards
+          const hasDependentDashboards = localStorage.getItem('hasDependentDashboards') === 'true';
+          
+          if (hasDependentDashboards) {
+            toast(
+              <div className={styles.syncReminderToast}>
+                Dashboard data may need updating.
+                <button 
+                  onClick={() => {
+                    toast.dismiss();
+                    updateDependentDashboards();
+                  }}
+                  className={styles.syncNowButton}
+                >
+                  Sync Now
+                </button>
+              </div>, 
+              { duration: 8000 }
+            );
+          }
         }
+        
       } else {
-        // New document
+        // Create new document
         const newDocRef = doc(collection(db, 'spreadsheets'));
         await setDoc(newDocRef, {
           ...spreadsheetData,
@@ -759,21 +897,23 @@ export default function Home() {
         
         setSpreadsheetId(newDocRef.id);
         router.push(`/spreadsheet?id=${newDocRef.id}`, undefined, { shallow: true });
+        
+        // Show success toast - FIXED THIS PART
+        toast.success("New spreadsheet created successfully");
+        
+        // Update state after successful save
+        setSheets(allSheets);
+        allSheetsRef.current = JSON.parse(JSON.stringify(allSheets));
+        setLastSaved(new Date());
       }
-      
-      // Update state after successful save - CRITICAL STEP
-      console.log("Updating local state with saved sheets:", allSheets.map(s => s.name));
-      setSheets(allSheets);  // Update state first
-      allSheetsRef.current = JSON.parse(JSON.stringify(allSheets)); // Then update ref
-      
-      setLastSaved(new Date());
-      toast.success('Spreadsheet saved successfully');
-      console.log("🟢 UNIFIED SAVE COMPLETED");
       
       return true;
     } catch (error) {
       console.error('Error saving spreadsheet:', error);
-      toast.error('Failed to save spreadsheet');
+      
+      // Show error toast - FIXED THIS PART
+      toast.error(`Failed to save: ${error.message}`);
+      
       return false;
     } finally {
       setIsSaving(false);
@@ -886,8 +1026,8 @@ export default function Home() {
             if (activeSheet) {
               console.log('📊 Loading data from active sheet:', activeSheet.name);
               setData(activeSheet.data || []);
-            }
-          } else {
+          }
+        } else {
             // No sheets found, create a default one
             const defaultSheet = {
               id: 'default',
@@ -1018,12 +1158,12 @@ export default function Home() {
               }, { rowIndex });
             })
           })),
-          lastModified: serverTimestamp()
+        lastModified: serverTimestamp()
         };
-        
+      
         // Update Firestore but DO NOT update state
         await updateDoc(doc(db, 'spreadsheets', spreadsheetId), serializedData);
-        setLastSaved(new Date());
+      setLastSaved(new Date());
       };
       
       // Execute our nested function to get latest state
@@ -1041,13 +1181,39 @@ export default function Home() {
       // Save on Ctrl+S or Command+S
       if ((e.ctrlKey || e.metaKey) && e.key === 's') {
         e.preventDefault(); // Prevent browser save dialog
-        saveSpreadsheet();
+        
+        // Check if an input field is currently focused
+        const activeElement = document.activeElement;
+        const isInputFocused = activeElement.tagName === 'INPUT' || 
+                              activeElement.tagName === 'TEXTAREA' || 
+                              activeElement.isContentEditable;
+        
+        // If an input is focused, blur it first to prevent the command key from affecting it
+        if (isInputFocused) {
+          activeElement.blur();
+        }
+        
+        // Store the current title
+        const currentTitle = documentTitle;
+        
+        // Use a small timeout to ensure the title hasn't changed
+        setTimeout(() => {
+          // If title changed due to command key, restore it
+          if (documentTitle !== currentTitle) {
+            console.log("Restoring document title after Cmd+S press");
+            setDocumentTitle(currentTitle);
+          }
+          
+          // Then call the save function
+          console.log("⌨️ Cmd+S pressed - using unified save function");
+          saveAllSpreadsheetData();
+        }, 10);
       }
     };
     
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, []);
+  }, [documentTitle]); // Add documentTitle to dependencies
 
   // Add this useEffect to fetch dashboards
   useEffect(() => {
@@ -1146,7 +1312,7 @@ export default function Home() {
     }
   };
 
-  // Add this function to add a chart to an existing dashboard
+  // Update the addChartToDashboard function to include more detailed source information
   const addChartToDashboard = async (dashboardId) => {
     if (!user || !chartConfig) {
       console.log("Missing user or chart config");
@@ -1167,9 +1333,36 @@ export default function Home() {
         ));
       }
       
-      // Extract source info before sanitizing
+      // Extract source data 
+      const activeSheet = sheets.find(s => s.id === activeSheetId);
+      const currentData = hotRef.current ? hotRef.current.hotInstance.getData() : [];
+      
+      // Get source info 
       const sourceRange = chartConfig.sourceInfo?.range || null;
       const sourceColumns = chartConfig.sourceInfo?.columns || [];
+      const sheetId = activeSheetId || 'default';
+      
+      // Create a data hash for change detection
+      let extractedData = [];
+      
+      if (sourceRange) {
+        const { startRow, startCol, endRow, endCol } = sourceRange;
+        // Extract the data range
+        for (let row = startRow; row <= endRow; row++) {
+          if (!currentData[row]) continue;
+          const rowData = [];
+          for (let col = startCol; col <= endCol; col++) {
+            rowData.push(currentData[row][col] || '');
+          }
+          extractedData.push(rowData);
+        }
+      } else {
+        // Use all data
+        extractedData = currentData;
+      }
+      
+      // Create a hash for change detection
+      const dataHash = JSON.stringify(extractedData);
       
       // Then sanitize for Firestore
       const sanitizedConfig = sanitizeForFirestore(cleanConfig);
@@ -1179,7 +1372,7 @@ export default function Home() {
         delete sanitizedConfig.sourceInfo;
       }
       
-      // Create chart item
+      // Create chart item with detailed source info
       const chartItem = {
         id: `chart_${Date.now()}`,
         type: 'chart',
@@ -1194,12 +1387,15 @@ export default function Home() {
           `${chartConfig.type.charAt(0).toUpperCase() + chartConfig.type.slice(1)} Chart` : 
           'Chart',
         createdAt: new Date().toISOString(),
-        sourceSpreadsheetId: spreadsheetId, // Explicitly set outside of sourceInfo
+        sourceSpreadsheetId: spreadsheetId,
         sourceInfo: {
-          spreadsheetId: spreadsheetId, // Also set in sourceInfo
+          spreadsheetId: spreadsheetId,
+          sheetId: sheetId,
+          sheetName: activeSheet?.name || 'Main Sheet',
           range: sourceRange,
           columns: sourceColumns,
-          lastUpdated: new Date().toISOString()
+          lastUpdated: new Date().toISOString(),
+          dataHash: dataHash
         }
       };
       
@@ -1218,13 +1414,45 @@ export default function Home() {
         // Add the new chart item
         const updatedItems = [...items, chartItem];
         
-        // Final sanitization before update
-        const sanitizedItems = sanitizeForFirestore(updatedItems);
+        // Deep sanitize items to ensure no nested arrays
+        const deepSanitizeForFirestore = (data) => {
+          if (data === null || data === undefined) return data;
+          
+          // Convert arrays to objects with numeric keys
+          if (Array.isArray(data)) {
+            const result = {};
+            data.forEach((item, index) => {
+              result[`_${index}`] = deepSanitizeForFirestore(item);
+            });
+            return result;
+          }
+          
+          // Handle objects
+          if (typeof data === 'object' && !(data instanceof Date)) {
+            const result = {};
+            Object.keys(data).forEach(key => {
+              if (data[key] !== undefined) {
+                result[key] = deepSanitizeForFirestore(data[key]);
+              }
+            });
+            return result;
+          }
+          
+          // Return primitives and Dates as is
+          return data;
+        };
+        
+        // Create a completely sanitized version of the items
+        const completelySanitizedItems = deepSanitizeForFirestore(updatedItems);
         
         // Update dashboard
         await updateDoc(dashboardRef, {
-          items: sanitizedItems,
-          lastModified: serverTimestamp()
+          items: completelySanitizedItems,
+          lastModified: serverTimestamp(),
+          lastSyncedWith: {
+            spreadsheetId: docId,
+            syncedAt: serverTimestamp()
+          }
         });
         
         console.log("Chart added successfully to dashboard:", dashboardId);
@@ -1344,26 +1572,52 @@ export default function Home() {
     }
   }, [showAddToDashboardModal, user]);
 
-  // Add this function after autoSaveSpreadsheet
+  // 1. First, let's improve the updateDependentDashboards function
   const updateDependentDashboards = async () => {
     // Skip if missing data or new document without ID
     const docId = spreadsheetId || router.query.id;
     if (!user || !docId || docId === 'new' || !hotRef.current) {
+      console.log("Dashboard update skipped - missing prerequisites");
       return;
     }
 
+    // Show a loading indicator
+    const loadingToast = toast.loading("Syncing dashboards...");
+    
     try {
-      // Get the current data
-      const currentData = hotRef.current.hotInstance.getData();
+      console.log("🔄 SYNCHRONIZING DASHBOARDS FOR:", docId);
+      
+      // Add sync status to the spreadsheet
+      await updateDoc(doc(db, 'spreadsheets', docId), {
+        syncStatus: 'in_progress',
+        syncStarted: serverTimestamp()
+      });
+
+      // STEP 1: Fetch the latest spreadsheet data from Firestore to ensure consistency
+      const spreadsheetRef = doc(db, 'spreadsheets', docId);
+      const spreadsheetSnap = await getDoc(spreadsheetRef);
+      
+      if (!spreadsheetSnap.exists()) {
+        console.error("Cannot update dashboards: Spreadsheet not found");
+        toast.dismiss(loadingToast);
+        toast.error("Spreadsheet not found");
+        return;
+      }
+      
+      const spreadsheetData = spreadsheetSnap.data();
       
       // Query for dashboards that might use this spreadsheet
       const dashboardsRef = collection(db, 'dashboards');
       const q = firestoreQuery(dashboardsRef, firestoreWhere('ownerId', '==', user.uid));
       const querySnapshot = await getDocs(q);
       
+      // Track metrics for user feedback
       let updatedCount = 0;
+      let totalChartsChecked = 0;
+      let chartsUpdated = 0;
+      let dashboardNames = [];
       
-      // Check each dashboard to see if it uses this spreadsheet
+      // Process each dashboard
       for (const dashboardDoc of querySnapshot.docs) {
         const dashboardId = dashboardDoc.id;
         const dashboard = dashboardDoc.data();
@@ -1373,15 +1627,13 @@ export default function Home() {
           continue;
         }
         
-        const items = dashboard.items;
         let dashboardNeedsUpdate = false;
-        
-        // Track which items need updates
-        const updatedItems = [...items];
+        const updatedItems = [...dashboard.items];
         
         // Check each chart item
-        for (let index = 0; index < items.length; index++) {
-          const item = items[index];
+        for (let index = 0; index < dashboard.items.length; index++) {
+          const item = dashboard.items[index];
+          totalChartsChecked++;
           
           // Skip non-chart items
           if (item.type !== 'chart') {
@@ -1398,65 +1650,206 @@ export default function Home() {
             continue;
           }
           
-          // Get range info
-          const range = item.sourceInfo?.range;
-          if (!range) {
-            continue;
-          }
-          
-          const { startRow, startCol, endRow, endCol } = range;
-          
-          // Extract data based on the range
-          const extractedData = [];
-          for (let row = startRow; row <= Math.min(endRow, currentData.length - 1); row++) {
-            if (!currentData[row]) continue;
+          try {
+            console.log(`Found chart in dashboard ${dashboard.title || 'Untitled'} using this spreadsheet`);
             
-            const rowData = [];
-            for (let col = startCol; col <= Math.min(endCol, (currentData[row].length || 0) - 1); col++) {
-              rowData.push(currentData[row][col] || '');
+            // Get sheet data from the fetched spreadsheet data
+            const sheetsData = spreadsheetData.sheets || [];
+            const sheetToUse = item.sourceInfo?.sheetId ? 
+              sheetsData.find(s => s.id === item.sourceInfo.sheetId) : 
+              sheetsData[0];
+              
+            if (!sheetToUse) {
+              console.error("Referenced sheet not found in spreadsheet");
+              continue;
             }
-            extractedData.push(rowData);
-          }
-          
-          if (extractedData.length === 0) {
-            continue;
-          }
-          
-          // Update the chart config with new data
-          if (item.chartConfig) {
-            const updatedChartConfig = updateChartDataInConfig(
-              JSON.parse(JSON.stringify(item.chartConfig)), 
-              extractedData
-            );
             
-            updatedItems[index] = {
-              ...item,
-              chartConfig: updatedChartConfig,
-              sourceInfo: {
-                ...item.sourceInfo,
-                lastUpdated: new Date().toISOString()
+            // Deserialize data from Firestore format (cell_0, cell_1, etc.) to 2D array
+            const sheetRows = sheetToUse.data || [];
+            const processedData = [];
+            
+            for (const row of sheetRows) {
+              if (!row || typeof row !== 'object') continue;
+              
+              const rowIndex = row.rowIndex;
+              const rowArray = [];
+              
+              // Get all cell_X keys and convert to array
+              const cellKeys = Object.keys(row).filter(key => key.startsWith('cell_'));
+              const maxColIndex = cellKeys.length > 0 ? 
+                Math.max(...cellKeys.map(key => parseInt(key.replace('cell_', '')))) : 0;
+                
+              for (let i = 0; i <= maxColIndex; i++) {
+                rowArray.push(row[`cell_${i}`] || '');
               }
-            };
+              
+              processedData[rowIndex] = rowArray;
+            }
             
-            dashboardNeedsUpdate = true;
+            // Process data according to chart's needs (range or all)
+            let extractedData = processedData;
+            
+            if (item.sourceInfo?.range) {
+              const { startRow, startCol, endRow, endCol } = item.sourceInfo.range;
+              
+              // Extract just the needed range
+              const rangeData = [];
+              for (let row = startRow; row <= Math.min(endRow, processedData.length - 1); row++) {
+                if (!processedData[row]) continue;
+                
+                const rowData = [];
+                for (let col = startCol; col <= Math.min(endCol, (processedData[row].length || 0) - 1); col++) {
+                  rowData.push(processedData[row][col] || '');
+                }
+                rangeData.push(rowData);
+              }
+              
+              extractedData = rangeData;
+            }
+            
+            if (extractedData.length === 0) {
+              console.warn("No data extracted for chart");
+              continue;
+            }
+            
+            // Create a hash of the data to check if it's actually changed
+            const dataHash = JSON.stringify(extractedData);
+            const previousHash = item.sourceInfo?.dataHash;
+            
+            // Only update if data has changed
+            if (dataHash !== previousHash) {
+              // Ensure the data is in the expected format for the dashboard
+              const formattedData = {
+                headers: extractedData[0] || [],
+                data: extractedData.slice(1) || []
+              };
+              
+              // Update the chart config with new data
+              const updatedChartConfig = updateChartDataInConfig(
+                JSON.parse(JSON.stringify(item.chartConfig)), 
+                extractedData
+              );
+              
+              updatedItems[index] = {
+                ...item,
+                chartConfig: updatedChartConfig,
+                sourceInfo: {
+                  ...item.sourceInfo,
+                  lastUpdated: new Date().toISOString(),
+                  dataHash: dataHash,
+                  formattedData: formattedData // Add the formatted data
+                }
+              };
+              
+              dashboardNeedsUpdate = true;
+              chartsUpdated++;
+            }
+          } catch (error) {
+            console.error(`Error updating chart in dashboard ${dashboard.title}:`, error);
           }
         }
         
         // If any items were updated, update the dashboard
         if (dashboardNeedsUpdate) {
-          await updateDoc(doc(db, 'dashboards', dashboardId), {
-            items: sanitizeForFirestore(updatedItems),
-            lastModified: serverTimestamp()
-          });
-          
-          updatedCount++;
+          try {
+            console.log(`Updating dashboard: ${dashboard.title || 'Untitled'}`);
+            
+            // Deep sanitize items to ensure no nested arrays
+            const deepSanitizeForFirestore = (data) => {
+              if (data === null || data === undefined) return data;
+              
+              // Convert arrays to objects with numeric keys
+              if (Array.isArray(data)) {
+                const result = {};
+                data.forEach((item, index) => {
+                  result[`_${index}`] = deepSanitizeForFirestore(item);
+                });
+                return result;
+              }
+              
+              // Handle objects
+              if (typeof data === 'object' && !(data instanceof Date)) {
+                const result = {};
+                Object.keys(data).forEach(key => {
+                  if (data[key] !== undefined) {
+                    result[key] = deepSanitizeForFirestore(data[key]);
+                  }
+                });
+                return result;
+              }
+              
+              // Return primitives and Dates as is
+              return data;
+            };
+            
+            // Create a completely sanitized version of the items
+            const completelySanitizedItems = deepSanitizeForFirestore(updatedItems);
+            
+            // Use this for the Firestore update
+            await updateDoc(doc(db, 'dashboards', dashboardId), {
+              items: completelySanitizedItems,
+              lastModified: serverTimestamp(),
+              lastSyncedWith: {
+                spreadsheetId: docId,
+                syncedAt: serverTimestamp()
+              }
+            });
+            
+            updatedCount++;
+            dashboardNames.push(dashboard.title || 'Untitled dashboard');
+          } catch (error) {
+            console.error(`Error saving dashboard ${dashboard.title}:`, error);
+          }
         }
       }
       
-      // No notification here to keep it silent
+      // Update sync status when complete
+      await updateDoc(doc(db, 'spreadsheets', docId), {
+        syncStatus: 'completed',
+        lastSyncedAt: serverTimestamp(),
+        syncStats: {
+          dashboardsUpdated: updatedCount,
+          chartsUpdated: chartsUpdated,
+          totalChartsChecked: totalChartsChecked
+        }
+      });
+      
+      // Add to sync history
+      const syncHistoryRef = collection(db, 'spreadsheets', docId, 'syncHistory');
+      await addDoc(syncHistoryRef, {
+        timestamp: serverTimestamp(),
+        status: 'success',
+        dashboardsUpdated: updatedCount,
+        chartsUpdated: chartsUpdated,
+        dashboards: dashboardNames
+      });
+      
+      // Show success message
+      if (updatedCount > 0) {
+        console.log(`✅ Updated ${updatedCount} dashboards:`, dashboardNames.join(', '));
+        toast.dismiss(loadingToast);
+        toast.success(`Updated ${chartsUpdated} charts across ${updatedCount} dashboards`);
+        
+        // Store the sync time for reference
+        localStorage.setItem('lastDashboardSync', new Date().toISOString());
+        localStorage.setItem('lastSyncedSpreadsheet', docId);
+      } else {
+        console.log("No dashboards needed updating");
+        toast.dismiss(loadingToast);
+        toast("All dashboards are already up to date");  // Just basic toast
+      }
       
     } catch (error) {
-      // Silently fail for auto-updates
+      console.error("Error updating dashboards:", error);
+      
+      // Update sync status with error
+      await updateDoc(doc(db, 'spreadsheets', docId), {
+        syncStatus: 'error',
+        syncError: error.message
+      });
+      
+      toast.dismiss(loadingToast);
+      toast.error("Failed to update dashboards: " + error.message);
     }
   };
 
@@ -1488,42 +1881,38 @@ export default function Home() {
         }
       }
     } else if (['pie', 'doughnut', 'polarArea'].includes(chartConfig.type)) {
-      // For these chart types, we typically need labels and a single data series
+      // For pie/doughnut/polar charts, use first column as labels, second as data
       if (newData.length >= 2) {
         if (updatedConfig.data) {
-          updatedConfig.data.labels = newData[0];
+          // Update labels - use first column of data rows (skip header)
+          updatedConfig.data.labels = newData.slice(1).map(row => String(row[0] || ''));
           
-          // Get data from the second row
-          const dataValues = newData[1].map(val => 
-            typeof val === 'string' ? parseFloat(val) || 0 : val
+          // Use second column for data values
+          const dataValues = newData.slice(1).map(row => 
+            typeof row[1] === 'number' ? row[1] : parseFloat(row[1]) || 0
           );
           
-          // Update or create the dataset
-          if (updatedConfig.data.datasets && updatedConfig.data.datasets.length > 0) {
-            updatedConfig.data.datasets[0].data = dataValues;
-          } else {
+          // Update or create datasets
+          if (!updatedConfig.data.datasets || !updatedConfig.data.datasets.length) {
             updatedConfig.data.datasets = [{
               data: dataValues,
-              backgroundColor: dataValues.map((_, idx) => {
-                const hue = (idx * 137.5) % 360;
+              backgroundColor: updatedConfig.data.labels.map((_, i) => {
+                const hue = (i * 137.5) % 360;
                 return `hsla(${hue}, 70%, 60%, 0.7)`;
               })
             }];
+          } else {
+            updatedConfig.data.datasets[0].data = dataValues;
           }
         }
       }
-    } else if (chartConfig.type === 'scatter') {
-      // For scatter plots, we need pairs of x,y values
-      if (updatedConfig.data && updatedConfig.data.datasets) {
-        updatedConfig.data.datasets = [{
-          ...updatedConfig.data.datasets[0],
-          data: newData.slice(1).map(row => ({
-            x: typeof row[0] === 'string' ? parseFloat(row[0]) || 0 : row[0],
-            y: typeof row[1] === 'string' ? parseFloat(row[1]) || 0 : row[1]
-          }))
-        }];
-      }
     }
+    
+    // Add a metadata field to track the format
+    updatedConfig._dataFormat = {
+      headers: newData[0] || [],
+      rows: newData.slice(1) || []
+    };
     
     return updatedConfig;
   };
@@ -1652,11 +2041,11 @@ export default function Home() {
       
       // Create new sheet
       const newSheetId = `sheet_${Date.now()}`;
-      const newSheet = {
+    const newSheet = {
         id: newSheetId,
         name: `Sheet ${updatedSheets.length + 1}`,
-        data: [['', '', '', ''], ['', '', '', '']]
-      };
+      data: [['', '', '', ''], ['', '', '', '']]
+    };
       
       // Add the new sheet to the updated list
       const newSheets = [...updatedSheets, newSheet];
@@ -1669,9 +2058,9 @@ export default function Home() {
       setActiveSheetId(newSheetId);
       
       // Load empty data into the grid
-      if (hotRef.current) {
-        hotRef.current.hotInstance.loadData(newSheet.data);
-        setData(newSheet.data);
+    if (hotRef.current) {
+      hotRef.current.hotInstance.loadData(newSheet.data);
+      setData(newSheet.data);
       }
       
       console.log("🟢 ADD SHEET OPERATION COMPLETED");
@@ -1700,7 +2089,7 @@ export default function Home() {
       // Update state with current sheet's data
       setSheets(prevSheets => {
         const updatedSheets = prevSheets.map(sheet => 
-          sheet.id === activeSheetId ? {...sheet, data: currentData} : sheet
+        sheet.id === activeSheetId ? {...sheet, data: currentData} : sheet
         );
         console.log("Updated sheets after change:", updatedSheets.map(s => s.name));
         debugSheetChange("handleSheetChange", updatedSheets);
@@ -1713,15 +2102,15 @@ export default function Home() {
     
     // Load new sheet data
     setTimeout(() => {
-      const selectedSheet = sheets.find(sheet => sheet.id === sheetId);
-      if (selectedSheet && hotRef.current) {
+    const selectedSheet = sheets.find(sheet => sheet.id === sheetId);
+    if (selectedSheet && hotRef.current) {
         console.log(`Loading sheet: ${selectedSheet.name} (${selectedSheet.data.length} rows)`);
-        hotRef.current.hotInstance.loadData(selectedSheet.data);
-        setData(selectedSheet.data);
+      hotRef.current.hotInstance.loadData(selectedSheet.data);
+      setData(selectedSheet.data);
         console.log("=== SHEET CHANGE OPERATION COMPLETED ===");
       } else {
         console.error(`Could not find sheet with ID: ${sheetId}`);
-      }
+    }
     }, 50);
   };
 
@@ -1917,71 +2306,12 @@ export default function Home() {
     }
     
     console.log("=== AUTO-SAVE STARTED ===");
-    
     try {
-      // Get current data from the active sheet
-      const currentData = hotRef.current.hotInstance.getData();
-      
-      // Get the latest sheets state directly from the state variable
-      console.log("DIRECT sheets state for auto-save:", sheets);
-      
-      // Make a deep copy of all sheets
-      const allSheets = sheets.map(sheet => ({
-        ...sheet,
-        data: [...(sheet.data || [])]
-      }));
-      
-      // Find the currently active sheet
-      const activeSheetIndex = allSheets.findIndex(sheet => sheet.id === activeSheetId);
-      
-      // Update the active sheet with current data
-      if (activeSheetIndex >= 0) {
-        allSheets[activeSheetIndex] = {
-          ...allSheets[activeSheetIndex],
-          data: currentData
-        };
-      } else if (activeSheetId) {
-        // Sheet not found but we have an ID, add it
-        allSheets.push({
-          id: activeSheetId,
-          name: "Recovered Sheet",
-          data: currentData
-        });
-      }
-      
-      console.log(`Auto-save: Saving ${allSheets.length} sheets:`, 
-                 allSheets.map(s => s.name));
-      
-      // Create serialized data with ALL required fields
-      const serializedData = {
-        title: documentTitle,
-        sheets: allSheets.map(sheet => ({
-          id: sheet.id,
-          name: sheet.name,
-          data: sheet.data.map((row, rowIndex) => {
-            return row.reduce((rowObj, cellValue, colIndex) => {
-              rowObj[`cell_${colIndex}`] = cellValue || '';
-              return rowObj;
-            }, { rowIndex });
-          })
-        })),
-        lastModified: serverTimestamp(),
-        ownerId: user.uid,
-        ownerEmail: user.email,
-        ownerName: user.displayName || 'Unknown User'
-      };
-      
-      // Update Firestore
-      await updateDoc(doc(db, 'spreadsheets', spreadsheetId), serializedData);
-      setLastSaved(new Date());
-      
-      // Update local sheets state to match what we saved
-      setSheets(allSheets);
-      
+      await saveAllSpreadsheetData(); // Use the unified save function
       console.log("=== AUTO-SAVE COMPLETED ===");
       return Promise.resolve();
     } catch (error) {
-      console.error('Auto-save error:', error);
+      console.error("Auto-save failed:", error);
       return Promise.reject(error);
     }
   };
@@ -1993,14 +2323,53 @@ export default function Home() {
       // Save on Ctrl+S or Command+S
       if ((e.ctrlKey || e.metaKey) && e.key === 's') {
         e.preventDefault(); // Prevent browser save dialog
-        console.log("⌨️ Cmd+S pressed - using unified save function");
-        saveAllSpreadsheetData(); // Use the unified function directly
+        
+        // Check if an input field is currently focused
+        const activeElement = document.activeElement;
+        const isInputFocused = activeElement.tagName === 'INPUT' || 
+                              activeElement.tagName === 'TEXTAREA' || 
+                              activeElement.isContentEditable;
+        
+        // If an input is focused, blur it first to prevent the command key from affecting it
+        if (isInputFocused) {
+          activeElement.blur();
+        }
+        
+        // Store the current title
+        const currentTitle = documentTitle;
+        
+        // Use a small timeout to ensure the title hasn't changed
+        setTimeout(() => {
+          // If title changed due to command key, restore it
+          if (documentTitle !== currentTitle) {
+            console.log("Restoring document title after Cmd+S press");
+            setDocumentTitle(currentTitle);
+          }
+          
+          // Then call the save function
+          console.log("⌨️ Cmd+S pressed - using unified save function");
+          saveAllSpreadsheetData();
+        }, 10);
       }
     };
     
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, []);
+  }, [documentTitle]); // Add documentTitle to dependencies
+
+  // 3. Add a "Update Dashboards" function to manually trigger dashboard updates
+  const triggerDashboardUpdates = async () => {
+    if (!spreadsheetId || !user) return;
+    
+    console.log("Manually triggering dashboard updates");
+    try {
+      await updateDependentDashboards();
+      toast.success("Dashboards updated successfully");
+    } catch (error) {
+      console.error("Error updating dashboards:", error);
+      toast.error("Failed to update dashboards");
+    }
+  };
 
   return (
     <div className={styles.container}>
@@ -2018,10 +2387,22 @@ export default function Home() {
             <input 
               type="text" 
               value={documentTitle}
-              onChange={(e) => setDocumentTitle(e.target.value)}
+              onChange={(e) => {
+                const newTitle = e.target.value;
+                // Filter out any title that might be from keyboard shortcuts
+                if (newTitle !== "command +s" && !newTitle.includes("ctrl+s")) {
+                  setDocumentTitle(newTitle);
+                }
+              }}
               onBlur={() => {
                 // Force save on blur (when user clicks away)
                 if (user && spreadsheetId && spreadsheetId !== 'new' && documentTitle !== '') {
+                  // Don't save if title looks like a keyboard shortcut
+                  if (documentTitle === "command +s" || documentTitle.includes("ctrl+s")) {
+                    console.log("Skipping title save for keyboard shortcut title");
+                    return;
+                  }
+                  
                   updateDoc(doc(db, 'spreadsheets', spreadsheetId), {
                     title: documentTitle,
                     lastModified: serverTimestamp()
@@ -2081,6 +2462,31 @@ export default function Home() {
                 Save
               </>
             )}
+          </button>
+          
+          <button 
+            onClick={triggerDashboardUpdates}
+            className={styles.updateDashboardsButton}
+            title="Update dependent dashboards"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+              <path d="M8 3a5 5 0 1 0 4.546 2.914.5.5 0 0 1 .908-.417A6 6 0 1 1 8 2v1z"/>
+              <path d="M8 4.466V.534a.25.25 0 0 1 .41-.192l2.36 1.966c.12.1.12.284 0 .384L8.41 4.658A.25.25 0 0 1 8 4.466z"/>
+            </svg>
+            Update Dashboards
+          </button>
+          <button 
+            onClick={async () => {
+              console.log("Manual dashboard update triggered");
+              await updateDependentDashboards();
+            }}
+            className={styles.dashboardUpdateButton}
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+              <path d="M8 3a5 5 0 1 0 4.546 2.914.5.5 0 0 1 .908-.417A6 6 0 1 1 8 2v1z"/>
+              <path d="M8 4.466V.534a.25.25 0 0 1 .41-.192l2.36 1.966c.12.1.12.284 0 .384L8.41 4.658A.25.25 0 0 1 8 4.466z"/>
+            </svg>
+            Refresh Dashboards
           </button>
         </div>
       </header>

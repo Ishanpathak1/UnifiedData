@@ -2,15 +2,21 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { useAuth } from '../../contexts/AuthContext';
 import { db } from '../../utils/firebase';
-import { collection, query, where, orderBy, getDocs } from 'firebase/firestore';
+import { collection, query, where, orderBy, getDocs, deleteDoc, doc } from 'firebase/firestore';
 import styles from '../../styles/Dashboard.module.css';
 import Head from 'next/head';
+import ContextMenu from '../../components/ContextMenu';
+import DeleteConfirmModal from '../../components/DeleteConfirmModal';
 
 export default function Dashboards() {
   const [dashboards, setDashboards] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const { user, loading } = useAuth();
   const router = useRouter();
+  
+  // Add state for context menu and delete modal
+  const [contextMenu, setContextMenu] = useState(null);
+  const [deleteModal, setDeleteModal] = useState({ isOpen: false, dashboard: null });
 
   useEffect(() => {
     if (loading) return;
@@ -64,8 +70,54 @@ export default function Dashboards() {
       return 'Date unknown';
     }
   };
+  
+  // Handle right-click on dashboard card
+  const handleContextMenu = (e, dashboard) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setContextMenu({
+      x: e.clientX,
+      y: e.clientY,
+      dashboard
+    });
+  };
 
-  if (loading || (isLoading && user)) {
+  // Close context menu
+  const closeContextMenu = () => {
+    setContextMenu(null);
+  };
+
+  // Open delete confirmation modal
+  const openDeleteModal = (dashboard) => {
+    setDeleteModal({ isOpen: true, dashboard });
+  };
+
+  // Close delete confirmation modal
+  const closeDeleteModal = () => {
+    setDeleteModal({ isOpen: false, dashboard: null });
+  };
+
+  // Delete dashboard
+  const deleteDashboard = async () => {
+    const dashboardId = deleteModal.dashboard?.id;
+    if (!dashboardId) return;
+    
+    try {
+      await deleteDoc(doc(db, 'dashboards', dashboardId));
+      setDashboards(prev => prev.filter(dash => dash.id !== dashboardId));
+      console.log(`Dashboard ${dashboardId} deleted successfully`);
+      closeDeleteModal();
+    } catch (error) {
+      console.error('Error deleting dashboard:', error);
+      alert('Failed to delete dashboard. Please try again.');
+    }
+  };
+
+  const createNewDashboard = () => {
+    router.push('/dashboard/new');
+  };
+
+  if (loading || isLoading) {
     return (
       <div className={styles.loadingContainer}>
         <div className={styles.loadingSpinner}></div>
@@ -74,64 +126,45 @@ export default function Dashboards() {
     );
   }
 
-  if (!user) {
-    return (
-      <div className={styles.container}>
-        <header className={styles.header}>
-          <h1>Dashboards</h1>
-          <button
-            className={styles.backButton}
-            onClick={() => router.push('/')}
-          >
-            Back to Home
-          </button>
-        </header>
-        <div className={styles.authRequired}>
-          <div className={styles.authIcon}>🔒</div>
-          <h2>Sign in Required</h2>
-          <p>Please sign in to view your dashboards</p>
-          <button
-            className={styles.primaryButton}
-            onClick={() => router.push('/')}
-          >
-            Go to Home
-          </button>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div className={styles.container}>
+    <div className={styles.container} onClick={closeContextMenu}>
       <Head>
-        <title>Dashboards - UnifiedData</title>
+        <title>Dashboards | UnifiedData</title>
       </Head>
       
       <header className={styles.header}>
-        <h1>Your Dashboards</h1>
-        <button 
-          className={styles.backButton}
-          onClick={() => router.push('/')}
-        >
-          Back to Home
-        </button>
+        <h1 className={styles.logo}>UnifiedData</h1>
+        <nav className={styles.nav}>
+          <button 
+            className={styles.navButton}
+            onClick={() => router.push('/')}
+          >
+            Spreadsheets
+          </button>
+          <button 
+            className={`${styles.navButton} ${styles.active}`}
+            onClick={() => router.push('/dashboard')}
+          >
+            Dashboards
+          </button>
+        </nav>
       </header>
       
-      <main className={styles.dashboardListContent}>
+      <main className={styles.main}>
+        <div className={styles.actionsBar}>
+          <h2 className={styles.pageTitle}>Your Dashboards</h2>
+          
+        </div>
+        
         {dashboards.length === 0 ? (
           <div className={styles.emptyState}>
-            <div className={styles.emptyStateIcon}>
-              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" width="48" height="48">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-              </svg>
-            </div>
-            <h2>No dashboards yet</h2>
-            <p>Create your first dashboard by adding a chart from a spreadsheet</p>
+            <h3>No dashboards yet</h3>
+            <p>Create a dashboard to visualize your spreadsheet data.</p>
             <button 
-              className={styles.primaryButton}
-              onClick={() => router.push('/')}
+              className={styles.emptyStateButton}
+              onClick={createNewDashboard}
             >
-              Go to Spreadsheets
+              Create Your First Dashboard
             </button>
           </div>
         ) : (
@@ -141,6 +174,7 @@ export default function Dashboards() {
                 key={dashboard.id} 
                 className={styles.dashboardCard}
                 onClick={() => router.push(`/dashboard/${dashboard.id}`)}
+                onContextMenu={(e) => handleContextMenu(e, dashboard)}
               >
                 <div className={styles.dashboardPreview}>
                   {dashboard.items && dashboard.items.length > 0 ? (
@@ -169,6 +203,41 @@ export default function Dashboards() {
           </div>
         )}
       </main>
+      
+      {/* Context Menu */}
+      {contextMenu && (
+        <ContextMenu
+          x={contextMenu.x}
+          y={contextMenu.y}
+          onClose={closeContextMenu}
+          options={[
+            {
+              label: 'Open',
+              icon: '📊',
+              action: () => router.push(`/dashboard/${contextMenu.dashboard.id}`)
+            },
+            {
+              label: 'Edit',
+              icon: '✏️',
+              action: () => router.push(`/dashboard/edit/${contextMenu.dashboard.id}`)
+            },
+            {
+              label: 'Delete',
+              icon: '🗑️',
+              danger: true,
+              action: () => openDeleteModal(contextMenu.dashboard)
+            }
+          ]}
+        />
+      )}
+      
+      {/* Delete Confirmation Modal */}
+      <DeleteConfirmModal
+        isOpen={deleteModal.isOpen}
+        onClose={closeDeleteModal}
+        onConfirm={deleteDashboard}
+        itemName={deleteModal.dashboard?.title || 'this dashboard'}
+      />
     </div>
   );
 }

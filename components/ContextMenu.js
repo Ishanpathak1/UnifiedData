@@ -17,23 +17,47 @@ const ContextMenu = ({ x, y, onClose, options }) => {
     };
   }, [onClose]);
 
+  // Adjust position if menu would go off screen
+  const calculatePosition = () => {
+    const menuWidth = 200; // Approximate width of the menu
+    const menuHeight = options.length * 40; // Approximate height of the menu
+    
+    const windowWidth = typeof window !== 'undefined' ? window.innerWidth : 0;
+    const windowHeight = typeof window !== 'undefined' ? window.innerHeight : 0;
+    
+    let adjX = x;
+    let adjY = y;
+    
+    if (x + menuWidth > windowWidth) {
+      adjX = windowWidth - menuWidth - 10;
+    }
+    
+    if (y + menuHeight > windowHeight) {
+      adjY = windowHeight - menuHeight - 10;
+    }
+    
+    return { left: adjX, top: adjY };
+  };
+
+  const position = calculatePosition();
+
   return (
     <div 
       className={styles.contextMenu} 
-      style={{ top: y, left: x }}
+      style={{ left: position.left, top: position.top }}
       ref={menuRef}
     >
-      <ul>
+      <ul className={styles.menuList}>
         {options.map((option, index) => (
           <li 
-            key={index}
+            key={index} 
+            className={`${styles.menuItem} ${option.danger ? styles.dangerItem : ''}`}
             onClick={() => {
               option.action();
               onClose();
             }}
-            className={option.danger ? styles.dangerOption : ''}
           >
-            {option.icon && <span className={styles.icon}>{option.icon}</span>}
+            {option.icon && <span className={styles.menuIcon}>{option.icon}</span>}
             {option.label}
           </li>
         ))}

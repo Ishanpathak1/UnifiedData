@@ -1,43 +1,54 @@
 .contextMenu {
   position: fixed;
-  background: white;
-  border-radius: 4px;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-  min-width: 150px;
+  background-color: white;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
   z-index: 1000;
+  width: 200px;
   overflow: hidden;
+  animation: fadeIn 0.15s ease-in-out;
 }
 
-.contextMenu ul {
+.menuList {
   list-style: none;
+  padding: 0;
   margin: 0;
-  padding: 5px 0;
 }
 
-.contextMenu li {
-  padding: 8px 15px;
-  cursor: pointer;
+.menuItem {
+  padding: 10px 16px;
   display: flex;
   align-items: center;
-  font-size: 14px;
+  cursor: pointer;
   transition: background-color 0.2s;
+  user-select: none;
 }
 
-.contextMenu li:hover {
-  background-color: #f5f5f5;
+.menuItem:hover {
+  background-color: #f3f4f6;
 }
 
-.dangerOption {
-  color: #e53935;
-}
-
-.dangerOption:hover {
-  background-color: rgba(229, 57, 53, 0.1) !important;
-}
-
-.icon {
-  margin-right: 8px;
+.menuIcon {
+  display: inline-block;
+  margin-right: 10px;
   font-size: 16px;
-  display: inline-flex;
-  align-items: center;
+}
+
+.dangerItem {
+  color: #ef4444;
+}
+
+.dangerItem:hover {
+  background-color: #fee2e2;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }

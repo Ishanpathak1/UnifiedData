@@ -1,0 +1,61 @@
+.content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 10px 0;
+}
+
+.warningIcon {
+  width: 60px;
+  height: 60px;
+  margin-bottom: 20px;
+  color: #f59e0b;
+}
+
+.warningIcon svg {
+  width: 100%;
+  height: 100%;
+}
+
+.warningText {
+  color: #ef4444;
+  font-weight: 500;
+  margin-top: 10px;
+}
+
+.actionButtons {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+.cancelButton {
+  padding: 8px 16px;
+  border-radius: 6px;
+  background-color: #f3f4f6;
+  border: none;
+  font-weight: 500;
+  color: #374151;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.cancelButton:hover {
+  background-color: #e5e7eb;
+}
+
+.deleteButton {
+  padding: 8px 16px;
+  border-radius: 6px;
+  background-color: #ef4444;
+  border: none;
+  font-weight: 500;
+  color: white;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.deleteButton:hover {
+  background-color: #dc2626;
+}
