@@ -66,7 +66,7 @@
 
 .navButton.active {
   background-color: #F3F4F6;
-  color: #4361EE;
+  color: #4F46E5;
   font-weight: 500;
 }
 
@@ -97,8 +97,8 @@
 }
 
 .saveButton, .primaryButton, .emptyStateButton {
-  background-color: #4361EE;
-  border: 1px solid #4361EE;
+  background-color: #4F46E5;
+  border: 1px solid #4F46E5;
   color: white;
 }
 
@@ -119,7 +119,7 @@
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  background-color: #4361EE;
+  background-color: #4F46E5;
   color: white;
   border: none;
   padding: 0.625rem 1.25rem;
@@ -280,7 +280,7 @@
 .loadingLogo {
   font-size: 1.8rem;
   font-weight: 700;
-  color: #4361EE;
+  color: #4F46E5;
   margin-bottom: 1.5rem;
 }
 
@@ -288,7 +288,7 @@
   width: 3rem;
   height: 3rem;
   border: 3px solid #E5E7EB;
-  border-top: 3px solid #4361EE;
+  border-top: 3px solid #4F46E5;
   border-radius: 50%;
   animation: spin 1s linear infinite;
   margin-bottom: 1rem;
@@ -382,7 +382,7 @@
 .previewContent {
   width: 60px;
   height: 60px;
-  color: #4361EE;
+  color: #4F46E5;
   opacity: 0.8;
 }
 
@@ -407,7 +407,7 @@
   bottom: 0.5rem;
   right: 0.5rem;
   background-color: rgba(67, 97, 238, 0.1);
-  color: #4361EE;
+  color: #4F46E5;
   font-size: 0.75rem;
   padding: 0.25rem 0.5rem;
   border-radius: 1rem;
@@ -523,7 +523,7 @@
   width: 16px;
   height: 16px;
   border: 2px solid rgba(0, 0, 0, 0.1);
-  border-top-color: #4361EE;
+  border-top-color: #4F46E5;
   border-radius: 50%;
   animation: spin 1s linear infinite;
 }
@@ -539,7 +539,7 @@
 }
 
 .react-grid-item.react-grid-placeholder {
-  background: #4361EE;
+  background: #4F46E5;
   opacity: 0.2;
   z-index: 2;
   border-radius: 4px;
@@ -577,7 +577,7 @@
 .authIcon {
   font-size: 2.5rem;
   margin-bottom: 1rem;
-  color: #4361EE;
+  color: #4F46E5;
 }
 
 /* Responsive styles */
