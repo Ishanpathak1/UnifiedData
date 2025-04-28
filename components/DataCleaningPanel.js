@@ -55,10 +55,7 @@ const DataCleaningPanel = ({
       setAnalysisStage('scanning');
       setProgress(10);
       
-      console.log("Sending data to API:", { 
-        url: `${API_URL}/api/data-cleaning`,
-        dataLength: sheetData?.length || 0
-      });
+      
       
       // Update progress and stage
       setProgress(20);
@@ -104,14 +101,11 @@ const DataCleaningPanel = ({
       setProgress(95);
       
       // Log everything about the response
-      console.log("Response status:", rawResponse.status);
-      console.log("Response headers:", 
-        Object.fromEntries([...rawResponse.headers.entries()]));
+      
       
       // Get the text response
       const responseText = await rawResponse.text();
-      console.log("Raw response:", responseText);
-      
+     
       // Try to parse it as JSON
       let responseData;
       try {
@@ -202,7 +196,7 @@ const DataCleaningPanel = ({
   
   // Add a helper function for offline mode
   const useOfflineMode = () => {
-    console.log("Using offline analysis mode");
+    
     
     // Extract headers and data rows from the sheet data
     const headers = sheetData[0] || [];

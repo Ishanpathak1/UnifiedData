@@ -107,20 +107,12 @@ const removeFunctionsFromConfig = (config) => {
 
 // Add this debug function at the top level of your component
 const debugSheetChange = (location, newSheets) => {
-  console.log(`SHEETS CHANGED at ${location}: ${newSheets.length} sheets`, 
-              newSheets.map(s => s.name));
+
 };
 
 // Add this at the top of your component, before any state or ref declarations
 function traceStateChange(action, prevState, nextState) {
-  console.log(
-    `%c State Change: ${action}`,
-    'background: #333; color: #bada55; padding: 2px;',
-    {
-      prev: prevState ? prevState.map(s => s.name) : 'none',
-      next: nextState ? nextState.map(s => s.name) : 'none'
-    }
-  );
+  
 }
 
 // Add this component to your spreadsheet.js
@@ -405,11 +397,11 @@ export default function Home() {
       return;
     }
     
-    console.log("Creating chart with source from spreadsheet:", spreadsheetId);
+   
     
     // Extract data using hot
     const [startRow, startCol, endRow, endCol] = selection[0];
-    console.log("Selection range:", { startRow, startCol, endRow, endCol });
+    
     
     // Get selected column headers for source tracking
     const headers = hot.getDataAtRow(0);
@@ -421,7 +413,7 @@ export default function Home() {
       }
     }
     
-    console.log("Selected columns:", sourceColumns);
+   
     
     // Extract data for the chart
     const chartData = [];
@@ -436,7 +428,7 @@ export default function Home() {
       }
     }
     
-    console.log("Chart data:", chartData);
+    
     
     // Create chart config based on type
     let config;
@@ -537,7 +529,7 @@ export default function Home() {
       };
     }
     
-    console.log("Created chart with source info:", config.sourceInfo);
+    
     
     // Set chart config and show modal
     setChartConfig(config);
@@ -619,7 +611,7 @@ export default function Home() {
 
   // Update the resizing functions
   const startResizing = (e) => {
-    console.log("Start resizing");
+   
     setIsResizing(true);
     document.addEventListener('mousemove', handleMouseMove);
     document.addEventListener('mouseup', stopResizing);
@@ -640,7 +632,7 @@ export default function Home() {
   }, [isResizing]);
 
   const stopResizing = useCallback(() => {
-    console.log("Stop resizing");
+    
     setIsResizing(false);
     document.removeEventListener('mousemove', handleMouseMove);
     document.removeEventListener('mouseup', stopResizing);
@@ -719,8 +711,7 @@ export default function Home() {
       
       // If we have a reference with more sheets, restore from it
       if (allSheetsRef.current && allSheetsRef.current.length > 0) {
-        console.log("🛠️ Restoring sheets from reference:", 
-                   allSheetsRef.current.map(s => s.name));
+        
         setSheets([...allSheetsRef.current]);
         return allSheetsRef.current;
       }
@@ -732,7 +723,7 @@ export default function Home() {
         data: [Array(5).fill(''), Array(5).fill('')]
       };
       
-      console.log("🛠️ Creating default sheet");
+     
       setSheets([defaultSheet]);
       return [defaultSheet];
     }
@@ -743,7 +734,7 @@ export default function Home() {
 
   // 1. First, completely replace the saveSpreadsheet function with this:
   const saveSpreadsheet = async () => {
-    console.log("saveSpreadsheet called - redirecting to unified save function");
+    
     return saveAllSpreadsheetData();
   };
 
@@ -754,7 +745,7 @@ export default function Home() {
     setIsSaving(true);
     
     try {
-      console.log("🔄 UNIFIED SAVE STARTED");
+      
       
       // Get current editor data
       const currentData = hotRef.current.hotInstance.getData();
@@ -862,7 +853,7 @@ export default function Home() {
         if (shouldUpdateDashboards) {
           // Allow the save toast to be seen briefly before showing the sync toast
           setTimeout(async () => {
-            console.log("Automatically synchronizing dashboards after save...");
+            
             await updateDependentDashboards();
           }, 1000);
         } else {
@@ -935,7 +926,7 @@ export default function Home() {
   const loadSpreadsheetData = async (id) => {
     if (!user) return;
     
-    console.log("🔄 LOADING SPREADSHEET DATA:", id);
+   
     
     try {
       const docRef = doc(db, 'spreadsheets', id);
@@ -943,17 +934,14 @@ export default function Home() {
       
       if (docSnap.exists()) {
         const sheetData = docSnap.data();
-        console.log('📥 Loaded spreadsheet data:', {
-          title: sheetData.title,
-          sheetsCount: sheetData.sheets?.length || 0
-        });
+       
         
         setSpreadsheetId(id);
         
         if (sheetData.ownerId === user.uid) {
           // Set title
           if (sheetData.title) {
-            console.log('🏷️ Loading title:', sheetData.title);
+            
             setDocumentTitle(sheetData.title);
           } else {
             setDocumentTitle('Untitled spreadsheet');
@@ -961,8 +949,7 @@ export default function Home() {
           
           // Load sheets data
           if (sheetData.sheets && Array.isArray(sheetData.sheets) && sheetData.sheets.length > 0) {
-            console.log('📑 Loading sheets:', sheetData.sheets.length, 
-                      sheetData.sheets.map(s => s.name));
+           
             
             // Convert sheet data back to 2D arrays
             const processedSheets = sheetData.sheets.map(sheet => {
@@ -1008,8 +995,7 @@ export default function Home() {
               };
             });
             
-            console.log('✅ Processed sheets:', processedSheets.length, 
-                      processedSheets.map(s => s.name));
+            
             
             // Set the active sheet ID to the first sheet if we don't have one already
             if (!activeSheetId && processedSheets.length > 0) {
@@ -1025,7 +1011,7 @@ export default function Home() {
             // Load the data from the active sheet into the grid
             const activeSheet = processedSheets.find(s => s.id === activeSheetId) || processedSheets[0];
             if (activeSheet) {
-              console.log('📊 Loading data from active sheet:', activeSheet.name);
+              
               setData(activeSheet.data || []);
           }
         } else {
@@ -1036,7 +1022,7 @@ export default function Home() {
               data: [['', '', '', ''], ['', '', '', '']]
             };
             
-            console.log('⚠️ No sheets found, creating default sheet');
+            
             setSheets([defaultSheet]);
             allSheetsRef.current = [defaultSheet];
             setActiveSheetId(defaultSheet.id);
@@ -1092,7 +1078,7 @@ export default function Home() {
   useEffect(() => {
     if (!spreadsheetId || !user) return;
     
-    console.log("Setting up auto-save interval");
+    
     
     const autoSaveInterval = setInterval(() => {
       // Don't auto-save if currently manually saving
@@ -1109,7 +1095,7 @@ export default function Home() {
   const saveCurrentSheets = async () => {
     if (!user || !hotRef.current || !spreadsheetId || spreadsheetId === 'new') return;
     
-    console.log("=== AUTO-SAVE STARTED ===");
+    
     
     try {
       // Get current data from the active sheet
@@ -1120,8 +1106,7 @@ export default function Home() {
       const saveLatestSheets = async () => {
         // Get the latest sheets state directly 
         const currentSheets = [...sheets];
-        console.log(`Auto-save: Using current sheets array with ${currentSheets.length} sheets:`, 
-                   currentSheets.map(s => s.name));
+        
         
         // Find the currently active sheet
         const activeSheetIndex = currentSheets.findIndex(sheet => sheet.id === activeSheetId);
@@ -1143,8 +1128,7 @@ export default function Home() {
           });
         }
         
-        console.log(`Auto-save: Saving ${sheetsToSave.length} sheets:`, 
-                   sheetsToSave.map(s => s.name));
+        
         
         // Create serialized data
         const serializedData = {
@@ -1170,7 +1154,7 @@ export default function Home() {
       // Execute our nested function to get latest state
       await saveLatestSheets();
       
-      console.log("=== AUTO-SAVE COMPLETED ===");
+      
     } catch (error) {
       console.error('Auto-save error:', error);
     }
@@ -1201,12 +1185,12 @@ export default function Home() {
         setTimeout(() => {
           // If title changed due to command key, restore it
           if (documentTitle !== currentTitle) {
-            console.log("Restoring document title after Cmd+S press");
+            
             setDocumentTitle(currentTitle);
           }
           
           // Then call the save function
-          console.log("⌨️ Cmd+S pressed - using unified save function");
+          
           saveAllSpreadsheetData();
         }, 10);
       }
@@ -1316,12 +1300,11 @@ export default function Home() {
   // Update the addChartToDashboard function to include more detailed source information
   const addChartToDashboard = async (dashboardId) => {
     if (!user || !chartConfig) {
-      console.log("Missing user or chart config");
+      
       return;
     }
     
-    console.log("Adding chart to dashboard:", dashboardId);
-    console.log("Current spreadsheet ID:", spreadsheetId);
+   
     
     try {
       // First, make a clean copy without functions
@@ -1400,8 +1383,7 @@ export default function Home() {
         }
       };
       
-      console.log("Chart item to add:", chartItem.id);
-      console.log("Source info:", chartItem.sourceInfo);
+      
       
       // Get the dashboard document
       const dashboardRef = doc(db, 'dashboards', dashboardId);
@@ -1456,7 +1438,7 @@ export default function Home() {
           }
         });
         
-        console.log("Chart added successfully to dashboard:", dashboardId);
+        
         toast.success('Chart added to dashboard successfully!');
         setShowAddToDashboardModal(false);
       } else {
@@ -1471,16 +1453,12 @@ export default function Home() {
   // Add this function to create a new dashboard and add the chart
   const createAndAddToDashboard = async () => {
     if (!user || !chartConfig || !newDashboardTitle.trim()) {
-      console.log("Missing required data:", {
-        user: !!user,
-        chartConfig: !!chartConfig,
-        title: newDashboardTitle.trim()
-      });
+      
       return;
     }
     
     setIsCreatingDashboard(true);
-    console.log("Creating new dashboard:", newDashboardTitle);
+    
     
     try {
       // First strip out any functions from the config
@@ -1528,7 +1506,7 @@ export default function Home() {
         }
       };
       
-      console.log("Creating dashboard with chart:", chartItem);
+      
       
       // Create a new dashboard document with auto-generated ID
       const dashboardRef = doc(collection(db, 'dashboards'));
@@ -1546,7 +1524,7 @@ export default function Home() {
       // Save the dashboard to Firestore
       await setDoc(dashboardRef, dashboardData);
       
-      console.log("Dashboard created successfully:", dashboardId);
+    
       
       // Close the modal and reset form
       setShowAddToDashboardModal(false);
@@ -1568,7 +1546,7 @@ export default function Home() {
   // Add this effect to load dashboards when the modal opens
   useEffect(() => {
     if (showAddToDashboardModal && user) {
-      console.log("Modal opened, fetching dashboards");
+      
       fetchUserDashboards();
     }
   }, [showAddToDashboardModal, user]);
@@ -1578,7 +1556,7 @@ export default function Home() {
     // Skip if missing data or new document without ID
     const docId = spreadsheetId || router.query.id;
     if (!user || !docId || docId === 'new' || !hotRef.current) {
-      console.log("Dashboard update skipped - missing prerequisites");
+      
       return;
     }
 
@@ -1586,7 +1564,7 @@ export default function Home() {
     const loadingToast = toast.loading("Syncing dashboards...");
     
     try {
-      console.log("🔄 SYNCHRONIZING DASHBOARDS FOR:", docId);
+      
       
       // Add sync status to the spreadsheet
       await updateDoc(doc(db, 'spreadsheets', docId), {
@@ -1652,7 +1630,7 @@ export default function Home() {
           }
           
           try {
-            console.log(`Found chart in dashboard ${dashboard.title || 'Untitled'} using this spreadsheet`);
+            
             
             // Get sheet data from the fetched spreadsheet data
             const sheetsData = spreadsheetData.sheets || [];
@@ -1753,7 +1731,7 @@ export default function Home() {
         // If any items were updated, update the dashboard
         if (dashboardNeedsUpdate) {
           try {
-            console.log(`Updating dashboard: ${dashboard.title || 'Untitled'}`);
+            
             
             // Deep sanitize items to ensure no nested arrays
             const deepSanitizeForFirestore = (data) => {
@@ -1827,7 +1805,7 @@ export default function Home() {
       
       // Show success message
       if (updatedCount > 0) {
-        console.log(`✅ Updated ${updatedCount} dashboards:`, dashboardNames.join(', '));
+        
         toast.dismiss(loadingToast);
         toast.success(`Updated ${chartsUpdated} charts across ${updatedCount} dashboards`);
         
@@ -1835,7 +1813,7 @@ export default function Home() {
         localStorage.setItem('lastDashboardSync', new Date().toISOString());
         localStorage.setItem('lastSyncedSpreadsheet', docId);
       } else {
-        console.log("No dashboards needed updating");
+        
         toast.dismiss(loadingToast);
         toast("All dashboards are already up to date");  // Just basic toast
       }
@@ -1925,7 +1903,7 @@ export default function Home() {
     }
     
     try {
-      console.log("Checking if spreadsheet has dashboard dependencies:", spreadsheetId);
+      
       
       // Query for dashboards that use this spreadsheet
       const dashboardsRef = collection(db, 'dashboards');
@@ -1957,7 +1935,7 @@ export default function Home() {
         }
       });
       
-      console.log("Found dependent dashboards:", dependentDashboards.length);
+      
       return dependentDashboards;
     } catch (error) {
       console.error("Error checking spreadsheet dependencies:", error);
@@ -2021,17 +1999,17 @@ export default function Home() {
 
   // Add these functions to your main component
   const addSheet = () => {
-    console.log("🟡 ADD SHEET OPERATION STARTED");
+    
     
     // Get current data
     const currentData = hotRef.current?.hotInstance.getData() || data;
-    console.log("📊 Current data rows:", currentData.length);
+    
     
     // CRITICAL: Work with the current state directly in a function
     const safeAddSheet = () => {
       // Create complete copy of current sheets
       const currentSheets = [...sheets];
-      console.log("📑 Current sheets:", currentSheets.map(s => s.name));
+      
       
       // Update current sheet with latest data
       const updatedSheets = currentSheets.map(sheet => 
@@ -2050,7 +2028,7 @@ export default function Home() {
       
       // Add the new sheet to the updated list
       const newSheets = [...updatedSheets, newSheet];
-      console.log("📝 New sheets list:", newSheets.map(s => s.name));
+      
       
       // Update state with the combined list
       setSheets(newSheets);
@@ -2064,7 +2042,7 @@ export default function Home() {
       setData(newSheet.data);
       }
       
-      console.log("🟢 ADD SHEET OPERATION COMPLETED");
+      
       
       // Important: Return the new sheets
       return newSheets;
@@ -2073,26 +2051,26 @@ export default function Home() {
     // Execute inside a try/catch to prevent errors
     try {
       const newSheets = safeAddSheet();
-      console.log(`✅ Add sheet completed, now have ${newSheets.length} sheets`);
+      
     } catch (error) {
       console.error("❌ Error adding sheet:", error);
     }
   };
   
   const handleSheetChange = (sheetId) => {
-    console.log(`=== SHEET CHANGE OPERATION STARTED: ${sheetId} ===`);
+    
     
     // First save current sheet data
     if (hotRef.current && activeSheetId) {
       const currentData = hotRef.current.hotInstance.getData();
-      console.log(`Current sheet (${activeSheetId}) data captured, rows:`, currentData.length);
+      
       
       // Update state with current sheet's data
       setSheets(prevSheets => {
         const updatedSheets = prevSheets.map(sheet => 
         sheet.id === activeSheetId ? {...sheet, data: currentData} : sheet
         );
-        console.log("Updated sheets after change:", updatedSheets.map(s => s.name));
+        
         debugSheetChange("handleSheetChange", updatedSheets);
         return updatedSheets;
       });
@@ -2105,10 +2083,10 @@ export default function Home() {
     setTimeout(() => {
     const selectedSheet = sheets.find(sheet => sheet.id === sheetId);
     if (selectedSheet && hotRef.current) {
-        console.log(`Loading sheet: ${selectedSheet.name} (${selectedSheet.data.length} rows)`);
+        
       hotRef.current.hotInstance.loadData(selectedSheet.data);
       setData(selectedSheet.data);
-        console.log("=== SHEET CHANGE OPERATION COMPLETED ===");
+        
       } else {
         console.error(`Could not find sheet with ID: ${sheetId}`);
     }
@@ -2138,18 +2116,18 @@ export default function Home() {
       return;
     }
     
-    console.log('Title changed to:', documentTitle);
+   
     
     // Create a debounced save function to avoid too many saves while typing
     const saveTimeout = setTimeout(() => {
-      console.log('Saving title:', documentTitle);
+      
       
       updateDoc(doc(db, 'spreadsheets', spreadsheetId), {
         title: documentTitle,
         lastModified: serverTimestamp()
       })
       .then(() => {
-        console.log('Title saved successfully:', documentTitle);
+        
         setLastSaved(new Date());
       })
       .catch(error => {
@@ -2187,7 +2165,7 @@ export default function Home() {
     if (!user || !spreadsheetId || spreadsheetId === 'new') return;
     
     setIsSaving(true);
-    console.log("Saving sheets to DB:", JSON.stringify(sheetsToSave.map(s => ({id: s.id, name: s.name}))));
+    
     
     // Create a complete serialized data object
     const serializedSheets = sheetsToSave.map(sheet => ({
@@ -2208,12 +2186,12 @@ export default function Home() {
       lastModified: serverTimestamp()
     };
     
-    console.log(`Saving ${serializedSheets.length} sheets with title: "${documentTitle}"`);
+    
     
     updateDoc(doc(db, 'spreadsheets', spreadsheetId), serializedData)
       .then(() => {
         setLastSaved(new Date());
-        console.log("Successfully saved sheets to Firestore!");
+        
         toast.success('Saved successfully');
       })
       .catch(error => {
@@ -2238,7 +2216,7 @@ export default function Home() {
     // Keep ref in sync with state
     if (sheets && sheets.length > 0) {
       allSheetsRef.current = [...sheets];
-      console.log("Updated sheets ref, now contains:", sheets.map(s => s.name));
+      
     }
   }, [sheets]);
 
@@ -2246,7 +2224,7 @@ export default function Home() {
   useEffect(() => {
     // This will run when activeSheetId changes
     // We don't want to do anything except log for debugging
-    console.log(`Active sheet changed to: ${activeSheetId}`);
+    
     
     // DO NOT add auto-save logic here
   }, [activeSheetId]);
@@ -2265,7 +2243,7 @@ export default function Home() {
     */
     
     // Instead, just log that auto-save is disabled
-    console.log("Auto-save is temporarily disabled for debugging");
+    
     
     return () => {}; // Empty cleanup function
   }, [user, spreadsheetId]);
@@ -2281,7 +2259,7 @@ export default function Home() {
 
   // Add this effect to track when sheets state changes
   useEffect(() => {
-    console.log("SHEETS STATE CHANGED TO:", sheets.map(s => s.name));
+    
     
     // If sheets changed to an array with fewer items than we had before, log a warning
     if (allSheetsRef.current.length > sheets.length) {
@@ -2295,21 +2273,21 @@ export default function Home() {
 
   useEffect(() => {
     // Auto-save completely disabled for troubleshooting
-    console.log("📢 Auto-save is completely disabled");
+    
     return () => {};
   }, [spreadsheetId, user]);
 
   // Define autoSaveSpreadsheet as a Promise-returning function
   const autoSaveSpreadsheet = async () => {
     if (!user || !hotRef.current || !spreadsheetId || spreadsheetId === 'new') {
-      console.log("Auto-save skipped - prerequisites not met");
+      
       return Promise.resolve();
     }
     
-    console.log("=== AUTO-SAVE STARTED ===");
+    
     try {
       await saveAllSpreadsheetData(); // Use the unified save function
-      console.log("=== AUTO-SAVE COMPLETED ===");
+      
       return Promise.resolve();
     } catch (error) {
       console.error("Auto-save failed:", error);
@@ -2343,12 +2321,12 @@ export default function Home() {
         setTimeout(() => {
           // If title changed due to command key, restore it
           if (documentTitle !== currentTitle) {
-            console.log("Restoring document title after Cmd+S press");
+            
             setDocumentTitle(currentTitle);
           }
           
           // Then call the save function
-          console.log("⌨️ Cmd+S pressed - using unified save function");
+          
           saveAllSpreadsheetData();
         }, 10);
       }
@@ -2362,7 +2340,7 @@ export default function Home() {
   const triggerDashboardUpdates = async () => {
     if (!spreadsheetId || !user) return;
     
-    console.log("Manually triggering dashboard updates");
+    
     try {
       await updateDependentDashboards();
       toast.success("Dashboards updated successfully");
@@ -2374,7 +2352,7 @@ export default function Home() {
 
   // Function to apply data cleaning changes
   const applyDataCleaningChanges = (suggestions) => {
-    console.log("Applying suggestions:", suggestions); // For debugging
+     // For debugging
     
     // Clone current data to avoid direct mutation
     const newData = [...data];
@@ -2387,7 +2365,7 @@ export default function Home() {
       const actionValue = suggestion.action?.value;
       const columnType = suggestion.columnType || suggestion.column_name?.type || 'text';
       
-      console.log(`Processing suggestion for column ${columnIndex}, action: ${actionType}`);
+      
       
       if (columnIndex === undefined) {
         console.error("Invalid suggestion, missing column index:", suggestion);
@@ -2405,7 +2383,7 @@ export default function Home() {
               fillCount++;
             }
           }
-          console.log(`Filled ${fillCount} missing values in column ${columnIndex} with ${actionValue}`);
+          
           break;
           
         case 'convert_type':
@@ -2427,7 +2405,7 @@ export default function Home() {
               // Add other type conversions as needed
             }
           }
-          console.log(`Converted ${convertCount} values in column ${columnIndex} to type ${columnType}`);
+         
           break;
           
         case 'remove_rows':
@@ -2440,7 +2418,7 @@ export default function Home() {
               removeCount++;
             }
           }
-          console.log(`Marked ${removeCount} rows for removal due to missing values in column ${columnIndex}`);
+          
           break;
           
         default:
@@ -2491,7 +2469,7 @@ export default function Home() {
                 if (user && spreadsheetId && spreadsheetId !== 'new' && documentTitle !== '') {
                   // Don't save if title looks like a keyboard shortcut
                   if (documentTitle === "command +s" || documentTitle.includes("ctrl+s")) {
-                    console.log("Skipping title save for keyboard shortcut title");
+                    
                     return;
                   }
                   
@@ -2995,7 +2973,7 @@ export default function Home() {
               // Wait a moment for state to update, then auto-save and update dashboards
               setTimeout(() => {
                 autoSaveSpreadsheet().then(() => {
-                  console.log("Triggering dashboard updates after data change");
+                  
                   updateDependentDashboards();
                 });
               }, 300);
