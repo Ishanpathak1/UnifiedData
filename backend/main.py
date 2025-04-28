@@ -19,6 +19,8 @@ from statsmodels.stats.outliers_influence import variance_inflation_factor
 from openai import OpenAI
 import os
 from dotenv import load_dotenv
+import json
+import re
 
 # Load environment variables from .env.local
 load_dotenv(".env.local")
@@ -56,6 +58,17 @@ class CorrelationData(BaseModel):
     data: List[List[Any]]
     columns: List[str]
     
+# Data cleaning request model
+class DataCleaningRequest(BaseModel):
+    data: List[List[Any]]
+    retry_feedback: Optional[str] = None
+
+# Define data cleaning response model
+class DataCleaningResponse(BaseModel):
+    columns: List[Dict[str, Any]]
+    summary: Dict[str, Any]
+    suggestions: List[Dict[str, Any]]
+
 @app.post("/matrix-operations")
 async def perform_matrix_operation(data: MatrixData):
     try:
@@ -1013,6 +1026,371 @@ If the data is incomplete or doesn't contain information to answer the question,
     except Exception as e:
         return {"error": str(e)}
 
+@app.post("/api/data-cleaning")
+async def analyze_data_for_cleaning(request: Request):
+    """
+    Analyzes spreadsheet data and suggests cleaning operations using AI.
+    """
+    try:
+        # Get raw request body
+        body_bytes = await request.body()
+        
+        # Convert bytes to string and parse JSON manually
+        body_str = body_bytes.decode('utf-8')
+        
+        if not body_str:
+            return {"error": "Empty request body"}
+        
+        print(f"Received request body: {body_str[:100]}...")
+        
+        try:
+            body = json.loads(body_str)
+        except json.JSONDecodeError as e:
+            print(f"JSON parsing error: {e}")
+            return {"error": f"Invalid JSON: {str(e)}"}
+        
+        # Extract fields from parsed JSON
+        data = body.get("data", [])
+        retry_feedback = body.get("retry_feedback")
+        
+        # Validate data
+        if not isinstance(data, list) or len(data) < 2:
+            return {"error": "Insufficient data for analysis. Need at least headers and one data row."}
+        
+        headers = data[0]
+        data_rows = data[1:]
+        
+        # Perform basic data analysis for each column
+        basic_analysis = []
+        
+        for col_idx, header in enumerate(headers):
+            # Extract column values
+            column_values = [row[col_idx] if col_idx < len(row) else None for row in data_rows]
+            
+            # Calculate basic metrics
+            total_values = len(column_values)
+            missing_values = sum(1 for val in column_values if val is None or val == '')
+            non_empty_values = [val for val in column_values if val is not None and val != '']
+            
+            if not non_empty_values:
+                basic_analysis.append({
+                    "index": col_idx,
+                    "name": header or f"Column {col_idx + 1}",
+                    "type": "unknown",
+                    "confidence": 0,
+                    "stats": {
+                        "total": total_values,
+                        "missing": missing_values,
+                        "unique": 0
+                    },
+                    "issues": [
+                        {
+                            "type": "empty_column",
+                            "description": "Column contains no data",
+                            "severity": "high"
+                        }
+                    ]
+                })
+                continue
+            
+            # Count unique values
+            unique_values = len(set(non_empty_values))
+            
+            # Attempt to detect column type
+            numeric_values = []
+            date_values = 0
+            
+            # Check for numeric values
+            for val in non_empty_values:
+                try:
+                    num_val = float(str(val).replace(',', ''))
+                    numeric_values.append(num_val)
+                except (ValueError, TypeError):
+                    pass
+            
+            # Check for date patterns
+            date_pattern = re.compile(r'^\d{1,4}[-/\.]\d{1,2}[-/\.]\d{1,4}$')
+            date_values = sum(1 for val in non_empty_values if date_pattern.match(str(val)))
+            
+            # Determine column type
+            col_type = "text"
+            type_confidence = 0.5
+            
+            if len(numeric_values) / len(non_empty_values) > 0.7:
+                col_type = "numeric"
+                type_confidence = len(numeric_values) / len(non_empty_values)
+            elif date_values / len(non_empty_values) > 0.7:
+                col_type = "date"
+                type_confidence = date_values / len(non_empty_values)
+            elif unique_values / len(non_empty_values) < 0.3:
+                col_type = "categorical"
+                type_confidence = 0.8
+            
+            # Collect stats for this column
+            stats = {
+                "total": total_values,
+                "missing": missing_values,
+                "unique": unique_values
+            }
+            
+            # Add numeric stats if applicable
+            if col_type == "numeric" and numeric_values:
+                stats.update({
+                    "min": min(numeric_values),
+                    "max": max(numeric_values),
+                    "mean": sum(numeric_values) / len(numeric_values),
+                    "median": sorted(numeric_values)[len(numeric_values) // 2]
+                })
+            
+            # Detect basic issues
+            issues = []
+            
+            # Check for missing values
+            if missing_values > 0:
+                severity = "high" if missing_values > total_values * 0.2 else "medium"
+                issues.append({
+                    "type": "missing_values",
+                    "count": missing_values,
+                    "description": f"{missing_values} missing values detected",
+                    "severity": severity
+                })
+            
+            # Check for type mismatches in numeric columns
+            if col_type == "numeric" and len(numeric_values) < len(non_empty_values):
+                non_numeric_count = len(non_empty_values) - len(numeric_values)
+                issues.append({
+                    "type": "type_mismatch",
+                    "count": non_numeric_count,
+                    "description": f"{non_numeric_count} non-numeric values found",
+                    "severity": "high"
+                })
+            
+            basic_analysis.append({
+                "index": col_idx,
+                "name": header or f"Column {col_idx + 1}",
+                "type": col_type,
+                "confidence": type_confidence,
+                "stats": stats,
+                "issues": issues
+            })
+        
+        # Skip AI enhancement if there's an issue with OpenAI API
+        try_ai_enhancement = True
+        
+        if try_ai_enhancement:
+            try:
+                # Create prompt for AI enhancement
+                sample_rows = min(10, len(data_rows))
+                sample_data = data_rows[:sample_rows]
+                
+                ai_prompt = f"""
+I'm analyzing a spreadsheet with the following columns:
+{', '.join(headers)}
+
+Here's a sample of the data (first {sample_rows} rows):
+{json.dumps(sample_data)}
+
+For each column, I've done some basic analysis:
+{json.dumps(basic_analysis, indent=2)}
+
+{retry_feedback if retry_feedback else ""}
+
+Please provide for each column:
+1. A more precise data type classification
+2. Additional issues that might not be detected
+3. Specific cleaning recommendations with explanation
+4. The severity of each issue (low, medium, high)
+
+Format your response as JSON with the following structure:
+{{
+  "columns": [
+    {{
+      "index": 0,
+      "refinedType": "string",
+      "additionalIssues": [
+        {{
+          "type": "issue_type",
+          "description": "Issue description",
+          "severity": "medium",
+          "recommendation": "How to fix this issue"
+        }}
+      ]
+    }}
+  ]
+}}
+"""
+                # Call OpenAI API with error handling
+                try:
+                    ai_response = openai.chat.completions.create(
+                        model="gpt-4o",
+                        messages=[{"role": "user", "content": ai_prompt}],
+                        temperature=0.2,
+                        max_tokens=2000
+                    )
+                    
+                    ai_content = ai_response.choices[0].message.content
+                    
+                    # Log what we received
+                    print(f"Received AI response (first 100 chars): {ai_content[:100]}...")
+                    
+                    # Try to parse the AI response
+                    try:
+                        ai_result = json.loads(ai_content)
+                    except json.JSONDecodeError as json_error:
+                        print(f"Failed to parse OpenAI response as JSON: {json_error}")
+                        print(f"Raw response content: {ai_content[:200]}...")
+                        
+                        # Fall back to a simple analysis without AI enhancement
+                        ai_result = {"columns": []}
+                        
+                except Exception as openai_error:
+                    print(f"Error calling OpenAI API: {str(openai_error)}")
+                    # Fall back to a simple analysis
+                    ai_result = {"columns": []}
+                
+                # Merge AI recommendations with basic analysis (if any)
+                for col in basic_analysis:
+                    ai_col = next((c for c in ai_result.get("columns", []) if c.get("index") == col["index"]), None)
+                    
+                    if ai_col:
+                        # Update the column type if AI provided a refined type
+                        if "refinedType" in ai_col and ai_col["refinedType"]:
+                            col["type"] = ai_col["refinedType"]
+                        
+                        # Add AI-detected issues
+                        if "additionalIssues" in ai_col and ai_col["additionalIssues"]:
+                            col["issues"].extend(ai_col["additionalIssues"])
+            
+            except Exception as ai_error:
+                print(f"Error during AI enhancement: {str(ai_error)}")
+                # Continue with basic analysis only
+        
+        # Generate cleaning suggestions
+        suggestions = []
+        for column in basic_analysis:
+            if column["issues"]:
+                for issue in column["issues"]:
+                    # Generate action based on issue type
+                    action = {}
+                    
+                    if issue["type"] == "missing_values":
+                        if column["type"] == "numeric" and "mean" in column["stats"]:
+                            action = {
+                                "type": "fill_missing",
+                                "value": column["stats"]["mean"],
+                                "description": f"Fill missing values with mean ({column['stats']['mean']:.2f})"
+                            }
+                        elif column["type"] == "categorical":
+                            # Find most common value (not implemented here, would require additional analysis)
+                            action = {
+                                "type": "fill_missing",
+                                "value": "MOST_COMMON",  # Placeholder
+                                "description": "Fill missing values with most common value"
+                            }
+                        else:
+                            action = {
+                                "type": "remove_rows",
+                                "description": "Remove rows with missing values"
+                            }
+                    elif issue["type"] == "type_mismatch":
+                        action = {
+                            "type": "convert_type",
+                            "description": f"Convert values to {column['type']} format or replace with null"
+                        }
+                    
+                    # Add recommendation from AI if available
+                    recommendation = issue.get("recommendation", "")
+                    
+                    if action:
+                        suggestions.append({
+                            "column_index": column["index"],
+                            "column_name": column["name"],
+                            "issue_type": issue["type"],
+                            "action": action,
+                            "recommendation": recommendation,
+                            "severity": issue.get("severity", "medium")
+                        })
+        
+        # Generate summary statistics
+        columns_with_issues = sum(1 for col in basic_analysis if col["issues"])
+        total_issues = sum(len(col["issues"]) for col in basic_analysis)
+        critical_issues = sum(
+            1 for col in basic_analysis 
+            for issue in col["issues"] 
+            if issue.get("severity") == "high"
+        )
+        
+        summary = {
+            "totalColumns": len(basic_analysis),
+            "columnsWithIssues": columns_with_issues,
+            "cleanColumns": len(basic_analysis) - columns_with_issues,
+            "totalIssues": total_issues,
+            "criticalIssues": critical_issues
+        }
+        
+        return {
+            "columns": basic_analysis,
+            "suggestions": suggestions,
+            "summary": summary
+        }
+        
+    except Exception as e:
+        print(f"Error in data cleaning analysis: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return {"error": str(e)}
+
+@app.post("/api/echo")
+async def echo_data(request: Request):
+    """Simple endpoint to echo back the received data for testing"""
+    try:
+        raw_body = await request.body()
+        try:
+            body_dict = json.loads(raw_body)
+            return {"received": body_dict, "status": "success"}
+        except json.JSONDecodeError as e:
+            return {"error": f"Invalid JSON format: {str(e)}", "raw_data": raw_body.decode('utf-8', errors='ignore')}
+    except Exception as e:
+        return {"error": str(e)}
+
+@app.post("/api/debug")
+async def debug_request(request: Request):
+    """Debug endpoint to inspect the request details"""
+    try:
+        # Get headers
+        headers = dict(request.headers)
+        
+        # Get query params
+        query_params = dict(request.query_params)
+        
+        # Try to get body
+        try:
+            body = await request.body()
+            body_text = body.decode('utf-8', errors='ignore')
+            
+            # Try to parse as JSON
+            try:
+                body_json = json.loads(body_text)
+            except:
+                body_json = None
+                
+            return {
+                "headers": headers,
+                "query_params": query_params,
+                "body_length": len(body),
+                "body_sample": body_text[:200] + ("..." if len(body_text) > 200 else ""),
+                "parsed_json": body_json is not None,
+                "status": "success"
+            }
+        except Exception as body_error:
+            return {
+                "headers": headers,
+                "query_params": query_params,
+                "body_error": str(body_error),
+                "status": "error reading body"
+            }
+    except Exception as e:
+        return {"error": str(e)}
 
 # Run with: uvicorn main:app --reload
 if __name__ == "__main__":

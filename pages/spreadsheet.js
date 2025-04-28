@@ -38,6 +38,7 @@ import { db } from '../utils/firebase';
 import { query as firestoreQuery } from 'firebase/firestore';
 import { where as firestoreWhere } from 'firebase/firestore';
 import { orderBy as firestoreOrderBy } from 'firebase/firestore';
+import DataCleaningPanel from '../components/DataCleaningPanel';
 
 // Register Chart.js components
 Chart.register(...registerables);
@@ -2371,6 +2372,97 @@ export default function Home() {
     }
   };
 
+  // Function to apply data cleaning changes
+  const applyDataCleaningChanges = (suggestions) => {
+    console.log("Applying suggestions:", suggestions); // For debugging
+    
+    // Clone current data to avoid direct mutation
+    const newData = [...data];
+    
+    // Apply each selected suggestion
+    suggestions.forEach(suggestion => {
+      // Handle different property naming conventions (API uses snake_case, local uses camelCase)
+      const columnIndex = suggestion.columnIndex || suggestion.column_index;
+      const actionType = suggestion.action?.type || 'unknown';
+      const actionValue = suggestion.action?.value;
+      const columnType = suggestion.columnType || suggestion.column_name?.type || 'text';
+      
+      console.log(`Processing suggestion for column ${columnIndex}, action: ${actionType}`);
+      
+      if (columnIndex === undefined) {
+        console.error("Invalid suggestion, missing column index:", suggestion);
+        return; // Skip this suggestion
+      }
+      
+      switch (actionType) {
+        case 'fill_missing':
+          // Fill missing values in this column
+          let fillCount = 0;
+          for (let i = 1; i < newData.length; i++) {
+            // Check if the cell is empty or undefined
+            if (!newData[i][columnIndex] || newData[i][columnIndex] === '') {
+              newData[i][columnIndex] = actionValue;
+              fillCount++;
+            }
+          }
+          console.log(`Filled ${fillCount} missing values in column ${columnIndex} with ${actionValue}`);
+          break;
+          
+        case 'convert_type':
+          // Convert values to appropriate type
+          let convertCount = 0;
+          for (let i = 1; i < newData.length; i++) {
+            const val = newData[i][columnIndex];
+            if (val !== null && val !== undefined && val !== '') {
+              if (columnType === 'numeric') {
+                // Try to convert to number
+                const numVal = parseFloat(String(val).replace(/,/g, ''));
+                if (!isNaN(numVal)) {
+                  newData[i][columnIndex] = numVal;
+                  convertCount++;
+                } else {
+                  newData[i][columnIndex] = ''; // Replace with empty for non-convertible values
+                }
+              }
+              // Add other type conversions as needed
+            }
+          }
+          console.log(`Converted ${convertCount} values in column ${columnIndex} to type ${columnType}`);
+          break;
+          
+        case 'remove_rows':
+          // For now, we'll just clear the values in these cells
+          // A full row removal would require restructuring the data
+          let removeCount = 0;
+          for (let i = 1; i < newData.length; i++) {
+            if (!newData[i][columnIndex] || newData[i][columnIndex] === '') {
+              // Mark this row somehow if needed
+              removeCount++;
+            }
+          }
+          console.log(`Marked ${removeCount} rows for removal due to missing values in column ${columnIndex}`);
+          break;
+          
+        default:
+          console.warn(`Unknown action type: ${actionType}`);
+      }
+    });
+    
+    // Update your spreadsheet data
+    setData(newData);
+    
+    // If you're using Handsontable, update it too
+    if (hotRef.current && hotRef.current.hotInstance) {
+      hotRef.current.hotInstance.loadData(newData);
+    }
+    
+    // Show success message
+    toast.success(`Applied ${suggestions.length} cleaning suggestions to your data`);
+  };
+
+  // Add this state declaration along with your other state variables:
+  const [showDataCleaningPanel, setShowDataCleaningPanel] = useState(false);
+
   return (
     <div className={styles.container}>
       {/* Header */}
@@ -2706,9 +2798,9 @@ export default function Home() {
           </button>
           <button 
             className={styles.toolbarButton}
-            onClick={() => setShowCleaningTools(!showCleaningTools)}
+            onClick={() => setShowDataCleaningPanel(true)}
           >
-            Data Cleaning ▾
+            <span>Clean Data</span>
           </button>
           
           {showCleaningTools && (
@@ -3669,6 +3761,13 @@ export default function Home() {
           </div>
         </div>
       )}
+
+      <DataCleaningPanel
+        isOpen={showDataCleaningPanel}
+        onClose={() => setShowDataCleaningPanel(false)}
+        sheetData={data}
+        applyChanges={applyDataCleaningChanges}
+      />
     </div>
   );
 }
