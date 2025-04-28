@@ -679,18 +679,7 @@ const DataCleaningPanel = ({
           )}
           
           {/* Test Mode Button */}
-          <button 
-            className={styles.secondaryButton}
-            onClick={() => {
-              setTestMode(!testMode);
-              if (!testMode) {
-                useOfflineMode();
-              }
-            }}
-            style={{ marginTop: '10px' }}
-          >
-            {testMode ? 'Disable Test Mode' : 'Enable Test Mode'}
-          </button>
+          
         </div>
       </div>
     </div>
