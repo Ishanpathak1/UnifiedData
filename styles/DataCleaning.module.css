@@ -180,7 +180,7 @@
 }
 
 .suggestionItem.selected {
-  border-color: #2196F3;
+  border-color: #0a00cf;
   background-color: rgba(33, 150, 243, 0.08);
   box-shadow: 0 0 0 2px rgba(33, 150, 243, 0.3);
 }
@@ -192,7 +192,7 @@
 }
 
 .suggestionItem.selected .suggestionContent {
-  border-left-color: #2196F3;
+  border-left-color: #1308e0;
 }
 
 .suggestionHeader {
@@ -305,7 +305,7 @@
 }
 
 .checkboxContainer input:checked ~ .checkmark {
-  background-color: #2196F3;
+  background-color: #0d00ff;
 }
 
 .checkmark:after {
@@ -351,7 +351,7 @@
 }
 
 .primaryButton:hover {
-  background-color: #2980b9;
+  background-color: #4F46E5;
 }
 
 .primaryButton:disabled {
