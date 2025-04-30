@@ -1,101 +1,139 @@
-# UnifiedData - Advanced Data Analysis Spreadsheet Applicatio
+# UnifiedData - Advanced Data Analysis Spreadsheet Application
 
 ## Overview
 
-UnifiedData is a modern web-based spreadsheet application with advanced data analysis capabilities. It combines the familiarity of spreadsheet interfaces with powerful analytics, visualizations, and interactive dashboards, all within a collaborative environment.
+UnifiedData is a modern web-based spreadsheet application with advanced data analysis capabilities. It combines the familiarity of spreadsheet interfaces with powerful analytics, matrix operations, and AI-powered insights, all within a collaborative environment.
 
 ## Features
 
 ### Core Spreadsheet Functionality
-- **Intuitive Spreadsheet Interface**: Excel-like grid with cell editing, formulas, and formatting
-- **Data Import/Export**: Support for CSV and Excel files with dependency tracking
+- **Intuitive Spreadsheet Interface**: Excel-like grid with cell editing and formatting
+- **Data Import/Export**: Support for CSV and Excel files
 - **Real-time Collaboration**: Multiple users can work on the same document simultaneously
 - **Auto-saving**: Automatic saving of changes to prevent data loss
-- **File History**: Track revisions and revert to previous versions when needed
+
+### Dashboard
+- **Overview Dashboard**: Quick access to all your spreadsheets and recent activities
+- **Activity Tracking**: View last modified dates and recent changes
+- **Quick Actions**: Create new spreadsheets, import data, or access recent files
+- **User Statistics**: Track your usage and data analysis activities
+
+### AI-Powered Features
+- **Ask AI**: 
+  - Natural language queries about your data
+  - AI-generated insights and explanations
+  - Context-aware responses based on your spreadsheet data
+  - Support for complex analytical questions
+
+- **Data Cleaning with AI**:
+  - Automatic data quality assessment
+  - Smart suggestions for data cleaning
+  - Detection of anomalies and inconsistencies
+  - Recommendations for data standardization
+  - Missing value analysis and suggestions
+  - Type detection and conversion recommendations
+
+### Data Inspector
+- **Column Analysis**:
+  - Data type detection
+  - Value distribution visualization
+  - Missing value identification
+  - Unique value counts
+  - Basic statistics (mean, median, mode)
+- **Quality Metrics**:
+  - Data completeness score
+  - Consistency checks
+  - Format validation
+  - Outlier detection
+- **Interactive Previews**:
+  - Quick value filtering
+  - Sort and view options
+  - Sample data examination
 
 ### Advanced Data Analysis
 
-#### Regression Analysis
-- **Multiple Regression Types**: Linear, logistic, polynomial, ridge, and lasso regression
-- **Statistical Metrics**: R-squared, adjusted R-squared, p-values, F-statistic, and standard errors
-- **Residual Analysis**: Plots of residuals to validate model assumptions
-- **Collinearity Diagnostics**: VIF (Variance Inflation Factor) detection
-- **Classification Metrics**: For logistic regression, including accuracy, precision, recall, F1 score
-- **ROC Curve Analysis**: AUC scores and visual ROC curve for classification performance
-- **Model Comparison**: Compare multiple regression models side-by-side
+#### Matrix Operations
+- **Basic Operations**: 
+  - Addition: Add two matrices of the same dimensions
+  - Subtraction: Subtract matrices of the same dimensions
+  - Multiplication: Matrix multiplication with compatible dimensions
+  - Transpose: Transpose a matrix
+- **Advanced Operations**: 
+  - Inverse: Calculate inverse of square matrices
+  - Determinant: Calculate determinant of square matrices
+  - Eigenvalues: Find eigenvalues of square matrices
+- **Error Handling**: Robust handling of singular matrices and dimension mismatches
+- **Visualizations**: Visual representation of matrix operations
+
+## Usage Instructions
+
+### Dashboard Navigation
+1. View all your spreadsheets in the dashboard
+2. Use quick actions to create or import spreadsheets
+3. Access recent files and track modifications
+
+### Creating a New Spreadsheet
+1. Click "New Spreadsheet" on the dashboard
+2. Use the grid interface to enter data
+3. Changes are automatically saved to your account
+
+### Using AI Features
+1. **Ask AI**:
+   - Click the "Ask AI" button in your spreadsheet
+   - Type your question in natural language
+   - View AI-generated insights and explanations
+
+2. **Data Cleaning**:
+   - Select "Clean Data" from the tools menu
+   - Review AI-generated suggestions
+   - Apply recommended cleaning actions
+
+### Data Inspector
+1. Open the Data Inspector panel
+2. View column-wise analysis and statistics
+3. Check data quality metrics
+4. Apply suggested improvements
+
+### Matrix Operations
+1. Enter matrix data in the spreadsheet
+2. Select the operation type (add, subtract, multiply, etc.)
+3. View the results and any error messages
+4. Results are displayed with proper formatting
+
+### Correlation Analysis
+1. Select the data columns for analysis
+2. Choose the correlation method (Pearson, Spearman, or Kendall)
+3. View the correlation coefficients and p-values
+4. Interpret the results with automatic insights
+
+### PCA Analysis
+1. Select the data for dimensionality reduction
+2. View the principal components and explained variance
+3. Analyze the transformed data
 
 #### Correlation Analysis
-- **Multiple Correlation Methods**: Pearson, Spearman, and Kendall tau correlation coefficients
+- **Multiple Correlation Methods**: 
+  - Pearson correlation coefficients
+  - Spearman correlation coefficients
+  - Kendall tau correlation coefficients
 - **Statistical Significance**: p-values for all correlation coefficients
-- **Heatmap Visualization**: Color-coded correlation matrices
 - **Interpretations**: Automatic interpretation of correlation strength and significance
-- **Scatter Plot Matrix**: Visualize relationships between multiple variables simultaneously
 
 #### Principal Component Analysis (PCA)
 - **Dimensionality Reduction**: Reduce high-dimensional data to principal components
 - **Explained Variance**: Track variance explained by each component
-- **Component Visualization**: Plot data on principal component axes
-- **Loading Vectors**: Analyze feature contributions to principal components
 - **Standardization**: Automatic data standardization for accurate analysis
 
-#### Matrix Operations
-- **Basic Operations**: Addition, subtraction, multiplication, and transpose
-- **Advanced Operations**: Inverse, determinant, eigenvalue decomposition
-- **Singular Value Decomposition (SVD)**: Decompose matrices for analysis
-- **Visualizations**: Visual representation of matrix operations and transformations
-- **Error Handling**: Robust handling of singular matrices and dimension mismatches
-
-#### Time Series Forecasting
-- **Multiple Methods**: ARIMA models and exponential smoothing
-- **Automatic Parameter Selection**: Smart model selection based on data patterns
-- **Seasonality Detection**: Automatic detection of seasonal patterns
-- **Confidence Intervals**: Visual representation of forecast uncertainty
-- **Error Metrics**: MAE and MAPE metrics to evaluate forecast accuracy
-
-### Visualization Tools
-- **Interactive Charts**: Create bar, line, pie, doughnut, polar area, and radar charts
-- **Chart Customization**: Fully customize colors, labels, and display options
-- **Scatter Plots**: Visualize relationships between variables
-- **ROC Curves**: Evaluate classification model performance
-- **Time Series Plots**: Visualize time-based data with trend lines
-- **Box Plots**: Analyze data distributions and identify outliers
-- **Heatmaps**: Visualize matrices and correlation data
-- **Export Options**: Download charts as images for presentations and reports
-
-### Dashboard Functionality
-- **Interactive Dashboards**: Create custom dashboards with multiple visualizations
-- **Live Data Connection**: Dashboards update automatically when source data changes
-- **Drag-and-Drop Interface**: Easily resize and reposition dashboard elements
-- **Sharing Options**: Share dashboards with team members
-- **Multiple Widget Types**: 
-  - Table widgets for displaying data in tabular format
-  - KPI widgets for highlighting key metrics
-  - Text widgets for adding commentary and context
-  - iFrame widgets for embedding external content
-
-### AI Integration
-- **Data Analysis Assistant**: Ask questions about your data in natural language
-- **Chart Recommendations**: AI suggests appropriate chart types based on your data
-- **Data Cleaning Suggestions**: Get recommendations for handling missing values and outliers
-- **Natural Language Queries**: Generate insights without writing complex formulas
-- **Insight Generation**: Automatic identification of patterns and anomalies in your data
-
 ### Data Management
-- **Data Cleaning Tools**: Remove outliers, fill missing values, normalize data
-- **Data Type Detection**: Automatic identification of text, numerical, and date values
-- **Data Inspector**: Explore and understand your dataset with descriptive statistics
-- **Import Warnings**: Alert when imported data might affect existing dashboards
-- **Template Library**: Pre-built templates for common analysis scenarios
-- **Version History**: Track changes and revert to previous versions if needed
+- **Data Type Detection**: Automatic identification of text and numerical values
+- **Data Inspector**: Explore and understand your dataset with basic statistics
+- **Version History**: Track changes through timestamps and last modified information
 
 ## Technology Stack
 
 ### Frontend
 - **Framework**: React.js with Next.js for server-side rendering
 - **UI Components**: Custom React components
-- **Data Visualization**: Chart.js with custom wrappers
-- **Spreadsheet Engine**: Handsontable for Excel-like experience
-- **Grid Layout**: React Grid Layout for dashboard customization
 - **State Management**: React Context API and custom hooks
 - **Authentication**: Firebase Authentication with Google Sign-In
 - **Styling**: CSS Modules and custom theming system
@@ -104,19 +142,11 @@ UnifiedData is a modern web-based spreadsheet application with advanced data ana
 - **API Framework**: FastAPI for high-performance Python backend
 - **Database**: Firebase Firestore for real-time data storage
 - **Authentication**: Firebase Auth for user management
-- **Storage**: Firebase Storage for file management
-- **Functions**: Serverless functions for heavy computational tasks
+- **AI Integration**: OpenAI GPT-4 for intelligent data analysis
 - **Data Analysis**: 
   - NumPy and Pandas for data manipulation
-  - scikit-learn for machine learning algorithms
-  - statsmodels for statistical modeling
-  - SciPy for scientific computing
-
-### Data Analysis Libraries
-- **Statistical Computing**: R integration for specialized analyses
-- **Machine Learning**: TensorFlow.js and scikit-learn
-- **Mathematical Operations**: math.js for client-side calculations
-- **Natural Language Processing**: For AI assistant functionality
+  - scikit-learn for PCA and standardization
+  - SciPy for statistical computing
 
 ## Getting Started
 
@@ -125,6 +155,7 @@ UnifiedData is a modern web-based spreadsheet application with advanced data ana
 - npm (v6.0.0 or later)
 - Python 3.8+ (for backend services)
 - Firebase account (for backend services)
+- OpenAI API key (for AI features)
 
 ### Installation
 
@@ -155,6 +186,7 @@ UnifiedData is a modern web-based spreadsheet application with advanced data ana
    NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=your-storage-bucket
    NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=your-messaging-sender-id
    NEXT_PUBLIC_FIREBASE_APP_ID=your-app-id
+   OPENAI_API_KEY=your-openai-api-key
    ```
 
 5. Run the development server:
@@ -164,59 +196,6 @@ UnifiedData is a modern web-based spreadsheet application with advanced data ana
 
 6. Open [http://localhost:3000](http://localhost:3000) with your browser to see the application.
 
-## Usage Instructions
-
-### Creating a New Spreadsheet
-1. Click "New Spreadsheet" on the home page
-2. Use the grid interface to enter data
-3. Changes are automatically saved to your account
-
-### Importing Data
-1. Click "File" > "Import File"
-2. Select a CSV or Excel file from your computer
-3. If the file would affect existing dashboards, you'll be prompted to create a new spreadsheet or replace the existing data
-
-### Creating Charts
-1. Select data in the spreadsheet
-2. Click on the chart type you want to create in the toolbar
-3. Customize the chart appearance as needed
-4. Use "Add to Dashboard" to include the chart in a dashboard
-
-### Running Analysis
-1. Select the data you want to analyze
-2. Choose the analysis type from the Analysis menu:
-   - Regression Analysis (Linear, Logistic, etc.)
-   - Correlation Analysis
-   - PCA Analysis
-   - Matrix Operations
-   - Time Series Forecasting
-3. Configure the analysis parameters
-4. View results, including visualizations and statistical metrics
-5. Optionally add the analysis results to a dashboard
-
-### Creating Dashboards
-1. Navigate to the Dashboards section
-2. Click "New Dashboard"
-3. Add charts and widgets from your spreadsheets
-4. Arrange and resize elements using the drag-and-drop interface
-5. Charts will automatically update when the source data changes
-
-### Using AI Features
-1. Click the "Ask AI" button in the top-right corner
-2. Type your question about the data (e.g., "What's the correlation between sales and marketing spend?")
-3. Review the AI-generated insights and visualizations
-
-
-## Acknowledgments
-
-- Handsontable for the spreadsheet component
-- Chart.js for visualization capabilities
-- Firebase for backend services
-- FastAPI for the Python backend
-- scikit-learn and statsmodels for statistical analysis
-- The open-source community for various libraries and tools that made this project possible
-
----
 
 ## Contact
 
