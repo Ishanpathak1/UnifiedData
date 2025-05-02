@@ -11,24 +11,6 @@ import LandingPage from '../components/LandingPage';
 import ContextMenu from '../components/ContextMenu';
 import DeleteConfirmModal from '../components/DeleteConfirmModal';
 
-function TypingText({ text, delay = 40 }) {
-  const [displayedText, setDisplayedText] = useState('');
-  const [currentIndex, setCurrentIndex] = useState(0);
-  
-  useEffect(() => {
-    if (currentIndex < text.length) {
-      const timeout = setTimeout(() => {
-        setDisplayedText(prevText => prevText + text[currentIndex]);
-        setCurrentIndex(prevIndex => prevIndex + 1);
-      }, delay);
-      
-      return () => clearTimeout(timeout);
-    }
-  }, [currentIndex, delay, text]);
-  
-  return <div>{displayedText}<span className={styles.cursor}>|</span></div>;
-}
-
 export default function Home() {
   const { user, loading } = useAuth();
   const [spreadsheets, setSpreadsheets] = useState([]);
@@ -36,9 +18,6 @@ export default function Home() {
   const [contextMenu, setContextMenu] = useState(null);
   const [deleteModal, setDeleteModal] = useState({ isOpen: false, spreadsheet: null });
   const router = useRouter();
-
-  // Get current path for active nav state
-  const currentPath = router.pathname;
 
   // Function to fetch spreadsheets
   const fetchSpreadsheets = async () => {
@@ -153,19 +132,19 @@ export default function Home() {
         <h1 className={styles.logo}>UnifiedData</h1>
         <nav className={styles.nav}>
           <button 
-            className={`${styles.navButton} ${currentPath === '/' ? styles.active : ''}`}
+            className={`${styles.navButton} ${router.pathname === '/' ? styles.active : ''}`}
             onClick={() => router.push('/')}
           >
             Spreadsheets
           </button>
           <button 
-            className={`${styles.navButton} ${currentPath === '/dashboard' ? styles.active : ''}`}
+            className={`${styles.navButton} ${router.pathname === '/dashboard' ? styles.active : ''}`}
             onClick={() => router.push('/dashboard')}
           >
             Dashboards
           </button>
           <button 
-            className={`${styles.navButton} ${currentPath === '/reports' ? styles.active : ''}`}
+            className={`${styles.navButton} ${router.pathname === '/reports' ? styles.active : ''}`}
             onClick={() => router.push('/reports')}
           >
             Reports
