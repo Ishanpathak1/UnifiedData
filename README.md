@@ -224,3 +224,7 @@ Try the live demo: [https://unifieddata.app](https://unifieddata.app)
 ## Contact
 
 For questions or support, please contact us at ishan.pathak2711@gmail.com or open an issue on GitHub.
+
+## License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
