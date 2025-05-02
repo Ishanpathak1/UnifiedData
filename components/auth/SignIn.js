@@ -5,10 +5,12 @@ import { auth, googleProvider } from '../../utils/firebase';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import styles from '../../styles/Auth.module.css';
 import Image from 'next/image';
+import { useRouter } from 'next/router';
 
 export default function SignIn() {
   const [user, loading, error] = useAuthState(auth);
   const [isSigningOut, setIsSigningOut] = useState(false);
+  const router = useRouter();
 
   const signInWithGoogle = async () => {
     try {
@@ -22,6 +24,7 @@ export default function SignIn() {
     try {
       setIsSigningOut(true);
       await signOut(auth);
+      router.push('/');
     } catch (error) {
       console.error("Error signing out", error);
     } finally {
