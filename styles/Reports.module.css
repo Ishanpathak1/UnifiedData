@@ -1,0 +1,502 @@
+.container {
+  padding: 2rem;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 2rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid #E5E7EB;
+}
+
+.header h1 {
+  color: #111827;
+  font-size: 1.875rem;
+  font-weight: 600;
+}
+
+.createButton {
+  background-color: #4F46E5;
+  color: white;
+  border: none;
+  padding: 0.75rem 1.5rem;
+  border-radius: 0.5rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.createButton:hover {
+  background-color: #4338CA;
+}
+
+.createButton:disabled {
+  background-color: #9CA3AF;
+  cursor: not-allowed;
+}
+
+.main {
+  min-height: 60vh;
+}
+
+.loading {
+  text-align: center;
+  padding: 2rem;
+  color: #666;
+}
+
+.error {
+  text-align: center;
+  padding: 2rem;
+  color: #e00;
+}
+
+.empty {
+  text-align: center;
+  padding: 2rem;
+  color: #666;
+}
+
+.reportsList {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 1.5rem;
+}
+
+.reportCard {
+  background: white;
+  border-radius: 8px;
+  padding: 1.5rem;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  position: relative;
+  cursor: context-menu;
+}
+
+.reportMeta {
+  margin-top: 1rem;
+  color: #666;
+  font-size: 0.9rem;
+}
+
+.modalOverlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 2rem;
+  overflow-y: auto;
+  z-index: 1000;
+}
+
+.modal {
+  background: white;
+  border-radius: 12px;
+  width: 100%;
+  max-width: 800px;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+}
+
+.modalHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1.5rem 2rem;
+  border-bottom: 1px solid #E5E7EB;
+  position: sticky;
+  top: 0;
+  background: white;
+  z-index: 1;
+}
+
+.modalHeader h2 {
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: #1F2937;
+  margin: 0;
+}
+
+.closeButton {
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  color: #6B7280;
+  cursor: pointer;
+  padding: 0.5rem;
+  border-radius: 6px;
+  transition: all 0.2s;
+}
+
+.closeButton:hover {
+  background: #F3F4F6;
+  color: #1F2937;
+}
+
+.formSection {
+  padding: 1.5rem 2rem;
+  border-bottom: 1px solid #E5E7EB;
+}
+
+.formSection:last-child {
+  border-bottom: none;
+}
+
+.formSection h3 {
+  font-size: 1.25rem;
+  color: #1F2937;
+  margin-bottom: 1rem;
+  font-weight: 600;
+}
+
+.input, .textarea, .select {
+  width: 100%;
+  padding: 0.75rem 1rem;
+  border: 1px solid #D1D5DB;
+  border-radius: 6px;
+  font-size: 1rem;
+  color: #1F2937;
+  background: white;
+  transition: all 0.2s;
+}
+
+.input:focus, .textarea:focus, .select:focus {
+  outline: none;
+  border-color: #4F46E5;
+  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+}
+
+.textarea {
+  min-height: 100px;
+  resize: vertical;
+}
+
+.configGroup {
+  background: #F9FAFB;
+  padding: 1.25rem;
+  border-radius: 8px;
+  margin-bottom: 1.5rem;
+}
+
+.configGroup h4 {
+  font-size: 1.1rem;
+  color: #374151;
+  margin-bottom: 1rem;
+  font-weight: 500;
+}
+
+.checkboxLabel {
+  display: flex;
+  align-items: center;
+  margin-bottom: 0.75rem;
+  cursor: pointer;
+  user-select: none;
+}
+
+.checkboxLabel input[type="checkbox"] {
+  width: 1.25rem;
+  height: 1.25rem;
+  margin-right: 0.75rem;
+  border: 2px solid #D1D5DB;
+  border-radius: 4px;
+  cursor: pointer;
+  accent-color: #4F46E5;
+}
+
+.visualizationItem {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+  margin-bottom: 1rem;
+  padding: 1rem;
+  background: white;
+  border-radius: 6px;
+  border: 1px solid #E5E7EB;
+}
+
+.addButton, .removeButton {
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.addButton {
+  background: #4F46E5;
+  color: white;
+  border: none;
+  width: 100%;
+  margin-top: 1rem;
+}
+
+.addButton:hover {
+  background: #4338CA;
+}
+
+.removeButton {
+  background: #FEE2E2;
+  color: #DC2626;
+  border: none;
+}
+
+.removeButton:hover {
+  background: #FEE2E2;
+}
+
+.modalFooter {
+  padding: 1.5rem 2rem;
+  display: flex;
+  justify-content: flex-end;
+  gap: 1rem;
+  border-top: 1px solid #E5E7EB;
+  position: sticky;
+  bottom: 0;
+  background: white;
+  z-index: 1;
+}
+
+.cancelButton, .submitButton {
+  padding: 0.75rem 1.5rem;
+  border-radius: 6px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.cancelButton {
+  background: white;
+  border: 1px solid #D1D5DB;
+  color: #374151;
+}
+
+.cancelButton:hover {
+  background: #F9FAFB;
+  border-color: #9CA3AF;
+}
+
+.submitButton {
+  background: #4F46E5;
+  color: white;
+  border: none;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.submitButton:hover {
+  background: #4338CA;
+}
+
+.submitButton:disabled {
+  background: #9CA3AF;
+  cursor: not-allowed;
+}
+
+.sheetSelection {
+  margin-top: 1rem;
+}
+
+.sheetItem {
+  padding: 1rem;
+  background: #F9FAFB;
+  border-radius: 6px;
+  margin-bottom: 0.75rem;
+}
+
+.dataPreview {
+  margin-top: 1rem;
+  background: white;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.dataPreview h5 {
+  padding: 0.75rem;
+  margin: 0;
+  background: #F3F4F6;
+  color: #374151;
+  font-weight: 500;
+}
+
+.previewTable {
+  border: 1px solid #E5E7EB;
+  border-radius: 0 0 6px 6px;
+}
+
+.previewRow {
+  display: flex;
+  border-bottom: 1px solid #E5E7EB;
+}
+
+.previewRow:last-child {
+  border-bottom: none;
+}
+
+.previewCell {
+  flex: 1;
+  padding: 0.75rem;
+  border-right: 1px solid #E5E7EB;
+  min-width: 100px;
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.previewCell:last-child {
+  border-right: none;
+}
+
+.error {
+  background: #FEE2E2;
+  color: #DC2626;
+  padding: 1rem;
+  border-radius: 6px;
+  margin: 1rem 2rem;
+}
+
+.loading {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  color: #6B7280;
+  padding: 1rem;
+}
+
+.spinner {
+  width: 1.25rem;
+  height: 1.25rem;
+  border: 2px solid #E5E7EB;
+  border-top-color: #4F46E5;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.empty {
+  padding: 2rem;
+  text-align: center;
+  color: #6B7280;
+  background: #F9FAFB;
+  border-radius: 6px;
+  border: 2px dashed #E5E7EB;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .modalOverlay {
+    padding: 1rem;
+  }
+
+  .modal {
+    max-height: 95vh;
+  }
+
+  .formSection {
+    padding: 1rem;
+  }
+
+  .modalHeader, .modalFooter {
+    padding: 1rem;
+  }
+
+  .visualizationItem {
+    flex-direction: column;
+  }
+
+  .removeButton {
+    width: 100%;
+  }
+
+  .modalFooter {
+    flex-direction: column-reverse;
+  }
+
+  .cancelButton, .submitButton {
+    width: 100%;
+  }
+}
+
+.actionButton {
+  background-color: #4F46E5;
+  color: white;
+  padding: 0.75rem 1.5rem;
+  border-radius: 0.5rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  border: none;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+.actionButton:hover {
+  background-color: #4338CA;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.actionButton:active {
+  transform: translateY(0);
+}
+
+.actionButton:disabled {
+  background-color: #9CA3AF;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.contextMenu {
+  position: fixed;
+  background: white;
+  border-radius: 0.5rem;
+  padding: 0.5rem;
+  min-width: 160px;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  border: 1px solid #e5e7eb;
+  z-index: 1000;
+}
+
+.contextMenuItem {
+  padding: 0.5rem 1rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: #374151;
+  font-size: 0.875rem;
+  border-radius: 0.375rem;
+  transition: all 0.2s;
+}
+
+.contextMenuItem:hover {
+  background-color: #f3f4f6;
+}
+
+.contextMenuItem.delete {
+  color: #dc2626;
+}
+
+.contextMenuItem.delete:hover {
+  background-color: #fee2e2;
+}

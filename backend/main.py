@@ -1,6 +1,6 @@
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import List, Optional, Dict, Any, Union, Tuple
 import numpy as np
 from sklearn.decomposition import PCA
@@ -68,6 +68,73 @@ class DataCleaningResponse(BaseModel):
     columns: List[Dict[str, Any]]
     summary: Dict[str, Any]
     suggestions: List[Dict[str, Any]]
+
+# New data models for report generation
+class SheetSelection(BaseModel):
+    spreadsheet_id: str
+    sheet_id: str
+    sheet_name: str
+    data: List[List[Any]]
+    selected_columns: Optional[List[str]] = None
+    data_range: Optional[Dict[str, int]] = None
+
+class ReportConfig(BaseModel):
+    data_quality: Optional[Dict[str, bool]] = Field(
+        default_factory=lambda: {
+            "missing_values": True,
+            "type_detection": True,
+            "anomaly_detection": True
+        }
+    )
+    statistical_analysis: Optional[Dict[str, Any]] = Field(
+        default_factory=lambda: {
+            "correlation": True,
+            "correlation_method": "pearson",
+            "basic_stats": True
+        }
+    )
+    predictive_analysis: Optional[Dict[str, Any]] = Field(
+        default_factory=lambda: {
+            "regression": False,
+            "regression_type": "linear",
+            "forecast": False,
+            "forecast_periods": 7
+        }
+    )
+    visualizations: Optional[List[Dict[str, Any]]] = Field(
+        default_factory=list
+    )
+    ai_analysis: Optional[Dict[str, bool]] = Field(
+        default_factory=lambda: {
+            "trends": True,
+            "insights": True,
+            "recommendations": True
+        }
+    )
+
+class ReportRequest(BaseModel):
+    title: str
+    description: Optional[str] = None
+    selected_sheets: List[SheetSelection]
+    config: ReportConfig
+    user_id: str
+
+class ReportSection(BaseModel):
+    title: str
+    content: Dict[str, Any]
+    visualizations: Optional[List[Dict[str, Any]]] = None
+    insights: Optional[List[str]] = None
+    progress_updates: Optional[List[Dict[str, Any]]] = None
+
+class ReportResponse(BaseModel):
+    report_id: str
+    title: str
+    description: Optional[str]
+    created_at: datetime
+    sections: List[ReportSection]
+    summary: Dict[str, Any]
+    status: str = "completed"
+    error: Optional[str] = None
 
 @app.post("/matrix-operations")
 async def perform_matrix_operation(data: MatrixData):
@@ -936,90 +1003,90 @@ async def ask_ai(request: Request):
     # Extract headers (first row)
     headers = spreadsheet_data[0] if spreadsheet_data and len(spreadsheet_data) > 0 else []
     
-    # Check if data is large (more than 300 rows)
-    is_large_data = len(spreadsheet_data) > 200
-    
-    # Format spreadsheet data for the prompt
-    if is_large_data:
-        # Take first 50 rows for context (including headers)
-        first_rows = spreadsheet_data[:51]  # This includes the header row
-        
-        # Take last 50 rows for context
-        last_rows = spreadsheet_data[-50:] if len(spreadsheet_data) > 100 else []
-        
-        # Calculate basic statistics for numeric columns
-        stats = {}
-        for col_idx, header in enumerate(headers):
-            # Try to extract numeric values from this column
-            try:
-                numeric_values = [float(row[col_idx]) for row in spreadsheet_data[1:] 
-                                 if col_idx < len(row) and row[col_idx] != '' and 
-                                 str(row[col_idx]).replace('.', '', 1).replace('-', '', 1).isdigit()]
-                
-                if numeric_values:
-                    stats[header] = {
-                        "min": min(numeric_values),
-                        "max": max(numeric_values),
-                        "mean": sum(numeric_values) / len(numeric_values),
-                        "count": len(numeric_values)
-                    }
-            except:
+    # Calculate comprehensive statistics for all columns
+    column_stats = {}
+    for col_idx, header in enumerate(headers):
+        try:
+            # Extract values for this column
+            values = [row[col_idx] for row in spreadsheet_data[1:] if col_idx < len(row) and row[col_idx] != '']
+            
+            if not values:
                 continue
+                
+            # Try to convert to numeric if possible
+            numeric_values = []
+            for val in values:
+                try:
+                    num_val = float(str(val).replace(',', ''))
+                    numeric_values.append(num_val)
+                except (ValueError, TypeError):
+                    pass
+            
+            # Calculate statistics
+            stats = {
+                "count": len(values),
+                "unique": len(set(values)),
+                "missing": len(spreadsheet_data[1:]) - len(values)
+            }
+            
+            if numeric_values:
+                stats.update({
+                    "min": min(numeric_values),
+                    "max": max(numeric_values),
+                    "mean": sum(numeric_values) / len(numeric_values),
+                    "median": sorted(numeric_values)[len(numeric_values)//2],
+                    "std": np.std(numeric_values) if len(numeric_values) > 1 else 0
+                })
+            
+            column_stats[header] = stats
+            
+        except Exception as e:
+            print(f"Error processing column {header}: {str(e)}")
+            continue
+    
+    # Calculate correlations between numeric columns
+    correlations = {}
+    numeric_columns = {h: [] for h, s in column_stats.items() if "mean" in s}
+    
+    if len(numeric_columns) >= 2:
+        for col_idx, header in enumerate(headers):
+            if header in numeric_columns:
+                try:
+                    values = [float(row[col_idx]) for row in spreadsheet_data[1:] 
+                             if col_idx < len(row) and row[col_idx] != '']
+                    numeric_columns[header] = values
+                except:
+                    continue
         
-        # Format first rows
-        formatted_first_rows = "\n".join(["\t".join(map(str, row)) for row in first_rows])
-        
-        # Format last rows if we have them
-        formatted_last_rows = ""
-        if last_rows:
-            formatted_last_rows = "\n".join(["\t".join(map(str, row)) for row in last_rows])
-        
-        # Format stats
-        formatted_stats = "\n".join([f"{header}: min={stats[header]['min']:.2f}, max={stats[header]['max']:.2f}, mean={stats[header]['mean']:.2f}, count={stats[header]['count']}" 
-                                    for header in stats])
-        
-        prompt = f"""
-Here is a large spreadsheet (total {len(spreadsheet_data)} rows) with a sample of the data (tab-separated).
-The column headers are: {', '.join(str(h) for h in headers)}
+        # Calculate correlations
+        for col1 in numeric_columns:
+            correlations[col1] = {}
+            for col2 in numeric_columns:
+                if col1 != col2:
+                    corr, _ = pearsonr(numeric_columns[col1], numeric_columns[col2])
+                    correlations[col1][col2] = corr
+    
+    # Format the prompt with comprehensive statistics
+    prompt = f"""
+Here is a comprehensive analysis of a dataset with {len(spreadsheet_data)} rows and {len(headers)} columns.
 
-First 50 rows (including headers):
-{formatted_first_rows}
+Column Statistics:
+{json.dumps(column_stats, indent=2)}
 
-{"Last 50 rows:" if formatted_last_rows else ""}
-{formatted_last_rows if formatted_last_rows else ""}
-
-Summary statistics for numeric columns:
-{formatted_stats}
+Correlations between numeric columns:
+{json.dumps(correlations, indent=2)}
 
 User's question: {query}
 
-Analyze the spreadsheet data sample and statistics to give a clear, helpful answer. 
-Be explicit that you're working with a sample of a larger dataset ({len(spreadsheet_data)} rows).
-If the question requires calculations, show your work and note that you're using the provided statistics or sample.
-If the answer involves identifying trends or patterns, explain them but note the limitations of working with a sample.
-If you need the complete dataset to answer accurately, say so.
-"""
-    else:
-        # For smaller datasets, use the original approach but highlight the headers
-        formatted_data = "\n".join(["\t".join(map(str, row)) for row in spreadsheet_data])
-
-        prompt = f"""
-Here is a spreadsheet table (tab-separated):
-The column headers are: {', '.join(str(h) for h in headers)}
-
-{formatted_data}
-
-User's question: {query}
-
-Analyze the spreadsheet data and give a clear, helpful answer based on the data. 
-If the question requires calculations, show your work.
-If the answer involves identifying trends or patterns, explain them.
-If the data is incomplete or doesn't contain information to answer the question, say so.
+Please analyze the data using these comprehensive statistics to provide a detailed answer.
+If the question requires specific data points, explain that you're using statistical summaries of the entire dataset.
+If the answer involves identifying trends or patterns, use the correlation analysis and statistical summaries.
+If you need more specific data to answer accurately, explain what additional information would be helpful.
 """
 
     try:
         response = openai.chat.completions.create(
-            model="gpt-4o",
+            model="gpt-4",
             messages=[{"role": "user", "content": prompt}]
         )
         return {"answer": response.choices[0].message.content}
@@ -1391,6 +1458,674 @@ async def debug_request(request: Request):
             }
     except Exception as e:
         return {"error": str(e)}
+
+# First, let's create a helper function to handle request data
+async def process_request_data(data: dict, endpoint_func) -> dict:
+    """Helper function to process request data through an endpoint function"""
+    try:
+        # Create a mock request object with the data
+        class MockReceive:
+            async def __call__(self):
+                return {
+                    "type": "http.request",
+                    "body": json.dumps(data).encode(),
+                    "more_body": False
+                }
+
+        request = Request(
+            scope={
+                "type": "http",
+                "method": "POST",
+                "headers": []
+            },
+            receive=MockReceive()
+        )
+        
+        # Call the endpoint function
+        return await endpoint_func(request)
+    except Exception as e:
+        print(f"Error processing request: {str(e)}")
+        return {"error": str(e)}
+
+# Now update the analysis functions
+async def analyze_data_quality(sheet: SheetSelection) -> ReportSection:
+    """Analyze data quality for a sheet"""
+    try:
+        # Prepare the data for analysis
+        request_data = {
+            "data": sheet.data
+        }
+        
+        # Use the helper function to process the request
+        cleaning_analysis = await process_request_data(request_data, analyze_data_for_cleaning)
+        
+        if isinstance(cleaning_analysis, dict):
+            if "error" in cleaning_analysis:
+                return ReportSection(
+                    title="Data Quality Analysis",
+                    content=cleaning_analysis,
+                    insights=[f"Data quality analysis error: {cleaning_analysis['error']}"]
+                )
+            
+            summary = cleaning_analysis.get("summary", {})
+            return ReportSection(
+                title="Data Quality Analysis",
+                content=cleaning_analysis,
+                insights=[
+                    f"Analyzed {len(sheet.data[0])} columns and {len(sheet.data)-1} rows",
+                    f"Found {summary.get('totalIssues', 0)} data quality issues",
+                    f"Identified {summary.get('criticalIssues', 0)} critical issues"
+                ]
+            )
+    except Exception as e:
+        print(f"Error in data quality analysis: {str(e)}")
+        return ReportSection(
+            title="Data Quality Analysis",
+            content={"error": str(e)},
+            insights=["Data quality analysis failed"]
+        )
+
+async def perform_ai_analysis(sheet: SheetSelection, config: Dict) -> ReportSection:
+    """Perform AI analysis on sheet data"""
+    try:
+        insights = []
+        
+        # Generate different types of insights based on config
+        if config.get("trends"):
+            trend_data = {
+                "query": "What are the main trends in this data?",
+                "data": sheet.data
+            }
+            trend_response = await process_request_data(trend_data, ask_ai)
+            if isinstance(trend_response, dict) and "answer" in trend_response:
+                insights.append(trend_response["answer"])
+        
+        if config.get("insights"):
+            insight_data = {
+                "query": "What are the key insights from this data?",
+                "data": sheet.data
+            }
+            insight_response = await process_request_data(insight_data, ask_ai)
+            if isinstance(insight_response, dict) and "answer" in insight_response:
+                insights.append(insight_response["answer"])
+        
+        if config.get("recommendations"):
+            recommendations_data = {
+                "query": "What recommendations can you make based on this data?",
+                "data": sheet.data
+            }
+            recommendations_response = await process_request_data(recommendations_data, ask_ai)
+            if isinstance(recommendations_response, dict) and "answer" in recommendations_response:
+                insights.append(recommendations_response["answer"])
+        
+        return ReportSection(
+            title="AI Insights",
+            content={"insights_count": len(insights)},
+            insights=insights if insights else ["No AI insights generated"]
+        )
+    except Exception as e:
+        print(f"Error in AI analysis: {str(e)}")
+        return ReportSection(
+            title="AI Insights",
+            content={"error": str(e)},
+            insights=["AI analysis failed"]
+        )
+
+# Add this new function to generate summary metrics
+def generate_summary_metrics(sheet: SheetSelection) -> Dict[str, Any]:
+    try:
+        metrics = {}
+        
+        # Get numeric columns (excluding first column if it's labels)
+        numeric_cols = []
+        for col_idx in range(1, len(sheet.data[0])):
+            try:
+                [float(row[col_idx]) for row in sheet.data[1:]]
+                numeric_cols.append(col_idx)
+            except (ValueError, TypeError):
+                continue
+        
+        # Calculate key metrics for each numeric column
+        for col_idx in numeric_cols:
+            col_name = sheet.data[0][col_idx]
+            values = [float(row[col_idx]) for row in sheet.data[1:]]
+            
+            metrics[col_name] = {
+                "total": sum(values),
+                "average": sum(values) / len(values),
+                "min": min(values),
+                "max": max(values),
+                "growth": (values[-1] - values[0]) / values[0] * 100  # Percentage growth
+            }
+        
+        # If we have Sales and Expenses, calculate profit metrics
+        if "Sales" in metrics and "Expenses" in metrics:
+            sales = [float(row[1]) for row in sheet.data[1:]]
+            expenses = [float(row[2]) for row in sheet.data[1:]]
+            profits = [s - e for s, e in zip(sales, expenses)]
+            
+            metrics["Profit"] = {
+                "total": sum(profits),
+                "average": sum(profits) / len(profits),
+                "min": min(profits),
+                "max": max(profits),
+                "growth": (profits[-1] - profits[0]) / profits[0] * 100
+            }
+        
+        return metrics
+    except Exception as e:
+        print(f"Error generating summary metrics: {str(e)}")
+        return {}
+
+# Update the main report generation endpoint
+@app.post("/api/reports/generate")
+async def generate_report(request: ReportRequest):
+    try:
+        report_sections = []
+        all_insights = []
+        summary_metrics = {}
+        
+        # Process each selected sheet
+        for sheet in request.selected_sheets:
+            # Generate summary metrics
+            sheet_metrics = generate_summary_metrics(sheet)
+            summary_metrics[sheet.sheet_name] = sheet_metrics
+            
+            # 1. Data Quality Analysis
+            if request.config.data_quality:
+                quality_section = await analyze_data_quality(sheet)
+                report_sections.append(quality_section)
+            
+            # 2. Statistical Analysis
+            if request.config.statistical_analysis:
+                stats_section = await perform_statistical_analysis(sheet, request.config.statistical_analysis)
+                report_sections.append(stats_section)
+            
+            # 3. Predictive Analysis
+            if request.config.predictive_analysis.get("regression") or request.config.predictive_analysis.get("forecast"):
+                predictive_section = await perform_predictive_analysis(sheet, request.config.predictive_analysis)
+                report_sections.append(predictive_section)
+            
+            # 4. Generate Visualizations
+            if request.config.visualizations:
+                viz_section = await generate_visualizations(sheet, request.config.visualizations)
+                report_sections.append(viz_section)
+            
+            # 5. AI Analysis
+            if request.config.ai_analysis:
+                ai_section = await perform_ai_analysis(sheet, request.config.ai_analysis)
+                report_sections.append(ai_section)
+                all_insights.extend(ai_section.insights or [])
+
+        # Create an executive summary section
+        executive_summary = create_executive_summary(summary_metrics, all_insights)
+        report_sections.insert(0, executive_summary)  # Add at the beginning
+        
+        # Create the final report with enhanced summary
+        report = ReportResponse(
+            report_id=f"report_{datetime.now().strftime('%Y%m%d_%H%M%S')}",
+            title=request.title,
+            description=request.description,
+            created_at=datetime.now(),
+            sections=report_sections,
+            summary={
+                "metrics": summary_metrics,
+                "key_findings": all_insights[:3],
+                "section_count": len(report_sections),
+                "generated_at": datetime.now().isoformat(),
+                "status": "completed"
+            }
+        )
+        
+        return report
+        
+    except Exception as e:
+        print(f"Error generating report: {str(e)}")
+        return ReportResponse(
+            report_id="error",
+            title=request.title,
+            description=request.description,
+            created_at=datetime.now(),
+            sections=[],
+            summary={},
+            status="error",
+            error=str(e)
+        )
+
+def create_executive_summary(metrics: Dict[str, Dict], insights: List[str]) -> ReportSection:
+    """Create an executive summary section"""
+    try:
+        summary_points = []
+        
+        for sheet_name, sheet_metrics in metrics.items():
+            if "Profit" in sheet_metrics:
+                profit_metrics = sheet_metrics["Profit"]
+                summary_points.extend([
+                    f"Total Profit: ${profit_metrics['total']:,.2f}",
+                    f"Average Monthly Profit: ${profit_metrics['average']:,.2f}",
+                    f"Profit Growth: {profit_metrics['growth']:.1f}%"
+                ])
+        
+        return ReportSection(
+            title="Executive Summary",
+            content={
+                "metrics": metrics,
+                "highlights": summary_points
+            },
+            insights=insights[:3] if insights else ["No key insights available"]
+        )
+    except Exception as e:
+        print(f"Error creating executive summary: {str(e)}")
+        return ReportSection(
+            title="Executive Summary",
+            content={"error": str(e)},
+            insights=["Failed to generate executive summary"]
+        )
+
+# Add this function to main.py
+async def perform_statistical_analysis(sheet: SheetSelection, config: Dict) -> ReportSection:
+    """Perform statistical analysis on sheet data"""
+    try:
+        results = {}
+        insights = []
+        visualizations = []
+        progress_updates = []
+
+        # Get headers and data
+        headers = sheet.data[0]
+        data_rows = sheet.data[1:]  # Use all data rows, not just a sample
+
+        # Add initial progress update
+        progress_updates.append({
+            "stage": "initializing",
+            "progress": 0,
+            "message": "Starting statistical analysis..."
+        })
+
+        # Basic statistics
+        if config.get("basic_stats", True):
+            progress_updates.append({
+                "stage": "processing",
+                "progress": 20,
+                "message": "Calculating basic statistics..."
+            })
+
+            stats = {}
+            for col_idx, header in enumerate(headers):
+                try:
+                    # Update progress for each column
+                    progress = 20 + int((col_idx / len(headers)) * 30)
+                    progress_updates.append({
+                        "stage": "processing",
+                        "progress": progress,
+                        "message": f"Analyzing column: {header}"
+                    })
+
+                    # Convert column values to float where possible
+                    values = [float(row[col_idx]) for row in data_rows if row[col_idx] != '']
+                    if values:
+                        stats[header] = {
+                            "count": len(values),
+                            "sum": sum(values),
+                            "mean": sum(values) / len(values),
+                            "min": min(values),
+                            "max": max(values),
+                            "std": np.std(values) if len(values) > 1 else 0,
+                            "median": np.median(values)
+                        }
+                        
+                        # Add insight for significant changes
+                        if len(values) > 1:
+                            change = ((values[-1] - values[0]) / values[0]) * 100
+                            insights.append(f"{header}: {change:+.1f}% change from start to end")
+                except (ValueError, TypeError):
+                    continue
+
+            results["basic_stats"] = stats
+
+        # Correlation analysis if we have numeric columns
+        if config.get("correlation", False):
+            progress_updates.append({
+                "stage": "processing",
+                "progress": 50,
+                "message": "Performing correlation analysis..."
+            })
+
+            try:
+                numeric_cols = {}
+                for col_idx, header in enumerate(headers):
+                    try:
+                        values = [float(row[col_idx]) for row in data_rows if row[col_idx] != '']
+                        if values:
+                            numeric_cols[header] = values
+                    except (ValueError, TypeError):
+                        continue
+
+                if len(numeric_cols) >= 2:
+                    correlation_data = {
+                        "data": [[value for value in numeric_cols[col]] for col in numeric_cols],
+                        "columns": list(numeric_cols.keys())
+                    }
+                    
+                    progress_updates.append({
+                        "stage": "processing",
+                        "progress": 60,
+                        "message": "Calculating correlation matrix..."
+                    })
+
+                    correlation_result = await process_request_data(
+                        correlation_data,
+                        perform_correlation_analysis
+                    )
+                    
+                    if correlation_result and "error" not in correlation_result:
+                        results["correlation"] = correlation_result
+                        
+                        # Add correlation visualization
+                        visualizations.append({
+                            "type": "heatmap",
+                            "data": correlation_result.get("matrix", []),
+                            "config": {
+                                "labels": list(numeric_cols.keys())
+                            },
+                            "title": "Correlation Matrix"
+                        })
+
+            except Exception as corr_error:
+                print(f"Correlation analysis error: {str(corr_error)}")
+
+        # Generate visualizations
+        progress_updates.append({
+            "stage": "processing",
+            "progress": 70,
+            "message": "Generating visualizations..."
+        })
+
+        for col_idx, header in enumerate(headers[1:], 1):  # Skip first column (usually labels)
+            try:
+                values = [float(row[col_idx]) for row in data_rows if row[col_idx] != '']
+                
+                # Line chart for trends
+                visualizations.append({
+                    "type": "line",
+                    "data": {
+                        "labels": [row[0] for row in data_rows],  # Use first column as labels
+                        "datasets": [{
+                            "label": header,
+                            "data": values,
+                            "borderColor": "rgba(75, 192, 192, 1)",
+                            "tension": 0.1
+                        }]
+                    },
+                    "title": f"{header} Trend"
+                })
+                
+            except (ValueError, TypeError):
+                continue
+
+        # Profit analysis if applicable
+        if "Sales" in stats and "Expenses" in stats:
+            progress_updates.append({
+                "stage": "processing",
+                "progress": 80,
+                "message": "Analyzing profit metrics..."
+            })
+
+            try:
+                sales = [float(row[headers.index("Sales")]) for row in data_rows if row[headers.index("Sales")] != '']
+                expenses = [float(row[headers.index("Expenses")]) for row in data_rows if row[headers.index("Expenses")] != '']
+                profits = [s - e for s, e in zip(sales, expenses)]
+                
+                results["profit_analysis"] = {
+                    "total_profit": sum(profits),
+                    "average_profit": sum(profits) / len(profits),
+                    "profit_margin": (sum(profits) / sum(sales)) * 100
+                }
+                
+                # Add profit visualization
+                visualizations.append({
+                    "type": "bar",
+                    "data": {
+                        "labels": [row[0] for row in data_rows],
+                        "datasets": [
+                            {
+                                "label": "Profit",
+                                "data": profits,
+                                "backgroundColor": "rgba(75, 192, 192, 0.5)"
+                            }
+                        ]
+                    },
+                    "title": "Profit Analysis"
+                })
+                
+                insights.append(
+                    f"Average profit margin: {results['profit_analysis']['profit_margin']:.1f}%"
+                )
+                
+            except Exception as profit_error:
+                print(f"Profit analysis error: {str(profit_error)}")
+
+        # Format insights into a more readable structure
+        progress_updates.append({
+            "stage": "finalizing",
+            "progress": 90,
+            "message": "Formatting insights..."
+        })
+
+        formatted_insights = []
+        for insight in insights:
+            if "change from start to end" in insight:
+                metric, change = insight.split(": ")
+                change_value = float(change.split("%")[0])
+                if change_value > 0:
+                    formatted_insights.append(f"📈 {metric} increased by {abs(change_value):.1f}%")
+                else:
+                    formatted_insights.append(f"📉 {metric} decreased by {abs(change_value):.1f}%")
+            else:
+                formatted_insights.append(f"ℹ️ {insight}")
+
+        # Add final progress update
+        progress_updates.append({
+            "stage": "completed",
+            "progress": 100,
+            "message": "Analysis complete!"
+        })
+
+        return ReportSection(
+            title="Statistical Analysis",
+            content=results,
+            visualizations=visualizations,
+            insights=formatted_insights,
+            progress_updates=progress_updates
+        )
+        
+    except Exception as e:
+        print(f"Error in statistical analysis: {str(e)}")
+        return ReportSection(
+            title="Statistical Analysis",
+            content={"error": str(e)},
+            insights=["Statistical analysis failed"],
+            progress_updates=[{
+                "stage": "error",
+                "progress": 0,
+                "message": f"Error: {str(e)}"
+            }]
+        )
+
+async def generate_visualizations(sheet: SheetSelection, viz_config: List[Dict]) -> ReportSection:
+    """Generate visualizations based on configuration for any dataset"""
+    try:
+        visualizations = []
+        insights = []
+
+        # Get headers and data
+        headers = sheet.data[0]
+        data_rows = sheet.data[1:]
+
+        # Identify numeric columns
+        numeric_columns = []
+        for col_idx, header in enumerate(headers):
+            try:
+                # Check if at least 70% of values in the column are numeric
+                numeric_count = sum(1 for row in data_rows if isinstance(row[col_idx], (int, float)) 
+                                 or (isinstance(row[col_idx], str) and row[col_idx].replace('.','',1).isdigit()))
+                if numeric_count / len(data_rows) >= 0.7:
+                    numeric_columns.append((col_idx, header))
+            except:
+                continue
+
+        # Get categorical columns (non-numeric)
+        categorical_columns = [(i, h) for i, h in enumerate(headers) if (i, h) not in numeric_columns]
+
+        for viz in viz_config:
+            viz_type = viz.get("type", "bar")
+            viz_title = viz.get("title", "")
+
+            try:
+                if viz_type == "bar":
+                    # If we have at least one numeric column and one categorical column
+                    if numeric_columns and categorical_columns:
+                        cat_idx, cat_header = categorical_columns[0]  # Use first categorical column for labels
+                        labels = [str(row[cat_idx]) for row in data_rows]
+                        
+                        # Create datasets for up to 3 numeric columns
+                        datasets = []
+                        colors = ["rgba(54, 162, 235, 0.5)", "rgba(255, 99, 132, 0.5)", 
+                                "rgba(75, 192, 192, 0.5)"]
+                        
+                        for (num_idx, num_header), color in zip(numeric_columns[:3], colors):
+                            values = [float(row[num_idx]) if row[num_idx] not in ['', None] else 0 
+                                    for row in data_rows]
+                            datasets.append({
+                                "label": num_header,
+                                "data": values,
+                                "backgroundColor": color
+                            })
+
+                        if datasets:  # Only create visualization if we have data
+                            visualizations.append({
+                                "type": "bar",
+                                "data": {
+                                    "labels": labels,
+                                    "datasets": datasets
+                                },
+                                "title": viz_title or f"Comparison by {cat_header}"
+                            })
+
+                            # Add insight about highest values
+                            for dataset in datasets:
+                                max_val = max(dataset["data"])
+                                max_idx = dataset["data"].index(max_val)
+                                insights.append(
+                                    f"Highest {dataset['label']}: {max_val:,.2f} in {labels[max_idx]}"
+                                )
+
+                elif viz_type == "line":
+                    # Create line chart for numeric columns over time/sequence
+                    if numeric_columns and categorical_columns:
+                        cat_idx, cat_header = categorical_columns[0]
+                        labels = [str(row[cat_idx]) for row in data_rows]
+                        
+                        datasets = []
+                        colors = ["rgba(54, 162, 235, 1)", "rgba(255, 99, 132, 1)", 
+                                "rgba(75, 192, 192, 1)"]
+                        
+                        for (num_idx, num_header), color in zip(numeric_columns[:3], colors):
+                            values = [float(row[num_idx]) if row[num_idx] not in ['', None] else 0 
+                                    for row in data_rows]
+                            datasets.append({
+                                "label": num_header,
+                                "data": values,
+                                "borderColor": color,
+                                "tension": 0.1
+                            })
+
+                        if datasets:
+                            visualizations.append({
+                                "type": "line",
+                                "data": {
+                                    "labels": labels,
+                                    "datasets": datasets
+                                },
+                                "title": viz_title or f"Trends over {cat_header}"
+                            })
+
+                            # Add trend insights
+                            for dataset in datasets:
+                                values = dataset["data"]
+                                if len(values) > 1:
+                                    change = ((values[-1] - values[0]) / values[0]) * 100
+                                    insights.append(
+                                        f"{dataset['label']} trend shows {change:+.1f}% change"
+                                    )
+
+                elif viz_type == "pie":
+                    # Create pie chart for distribution of a single numeric column
+                    if numeric_columns and categorical_columns:
+                        cat_idx, cat_header = categorical_columns[0]
+                        num_idx, num_header = numeric_columns[0]
+                        
+                        labels = [str(row[cat_idx]) for row in data_rows]
+                        values = [float(row[num_idx]) if row[num_idx] not in ['', None] else 0 
+                                for row in data_rows]
+
+                        visualizations.append({
+                            "type": "pie",
+                            "data": {
+                                "labels": labels,
+                                "datasets": [{
+                                    "data": values,
+                                    "backgroundColor": [
+                                        "rgba(54, 162, 235, 0.5)",
+                                        "rgba(255, 99, 132, 0.5)",
+                                        "rgba(75, 192, 192, 0.5)",
+                                        "rgba(255, 206, 86, 0.5)"
+                                    ]
+                                }]
+                            },
+                            "title": viz_title or f"{num_header} Distribution"
+                        })
+
+                elif viz_type == "scatter":
+                    # Create scatter plot if we have at least 2 numeric columns
+                    if len(numeric_columns) >= 2:
+                        x_idx, x_header = numeric_columns[0]
+                        y_idx, y_header = numeric_columns[1]
+                        
+                        x_data = [float(row[x_idx]) if row[x_idx] not in ['', None] else 0 
+                                for row in data_rows]
+                        y_data = [float(row[y_idx]) if row[y_idx] not in ['', None] else 0 
+                                for row in data_rows]
+
+                        visualizations.append({
+                            "type": "scatter",
+                            "data": {
+                                "datasets": [{
+                                    "label": f"{x_header} vs {y_header}",
+                                    "data": [{"x": x, "y": y} for x, y in zip(x_data, y_data)]
+                                }]
+                            },
+                            "title": viz_title or f"{x_header} vs {y_header} Correlation"
+                        })
+
+            except Exception as viz_error:
+                print(f"Error generating visualization {viz_type}: {str(viz_error)}")
+                continue
+
+        return ReportSection(
+            title="Visualizations",
+            content={},
+            visualizations=visualizations,
+            insights=insights
+        )
+
+    except Exception as e:
+        print(f"Error in visualization generation: {str(e)}")
+        return ReportSection(
+            title="Visualizations",
+            content={"error": str(e)},
+            insights=["Visualization generation failed"]
+        )
 
 # Run with: uvicorn main:app --reload
 if __name__ == "__main__":
