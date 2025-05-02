@@ -39,8 +39,6 @@ import { query as firestoreQuery } from 'firebase/firestore';
 import { where as firestoreWhere } from 'firebase/firestore';
 import { orderBy as firestoreOrderBy } from 'firebase/firestore';
 import DataCleaningPanel from '../components/DataCleaningPanel';
-import { HyperFormula } from 'hyperformula';
-import debounce from 'lodash.debounce';
 
 // Register Chart.js components
 Chart.register(...registerables);
@@ -2443,11 +2441,6 @@ export default function Home() {
   // Add this state declaration along with your other state variables:
   const [showDataCleaningPanel, setShowDataCleaningPanel] = useState(false);
 
-  // Debounced save function to avoid excessive Firestore writes
-  const debouncedSaveAllSpreadsheetData = debounce(() => {
-    saveAllSpreadsheetData();
-  }, 1000); // 1 second debounce
-
   return (
     <div className={styles.container}>
       {/* Header */}
@@ -2926,35 +2919,14 @@ export default function Home() {
                   type="text"
                   className={styles.formulaInput}
                   value={
-                    selectedCell && hotRef.current &&
-                    typeof selectedCell.row === 'number' &&
-                    typeof selectedCell.col === 'number' &&
-                    selectedCell.row >= 0 &&
-                    selectedCell.col >= 0
-                      ? (() => {
-                          const cellValue = hotRef.current.hotInstance.getDataAtCell(selectedCell.row, selectedCell.col) || '';
-                          const cellMeta = hotRef.current.hotInstance.getCellMeta(selectedCell.row, selectedCell.col);
-                          if (cellMeta && cellMeta.formula) {
-                            return cellMeta.formula.expression || cellValue;
-                          }
-                          return cellValue;
-                        })()
+                    selectedCell && hotRef.current
+                      ? hotRef.current.hotInstance.getDataAtCell(selectedCell.row, selectedCell.col) || ''
                       : ''
                   }
                   onChange={(e) => {
                     if (selectedCell && hotRef.current) {
-                      let value = e.target.value;
-                      // If the value starts with '=', treat it as a formula
-                      if (value.startsWith('=')) {
-                        hotRef.current.hotInstance.setDataAtCell(selectedCell.row, selectedCell.col, value);
-                      } else {
-                        hotRef.current.hotInstance.setDataAtCell(selectedCell.row, selectedCell.col, value);
-                      }
+                      hotRef.current.hotInstance.setDataAtCell(selectedCell.row, selectedCell.col, e.target.value);
                     }
-                  }}
-                  onBlur={() => {
-                    // Debounced save on blur
-                    debouncedSaveAllSpreadsheetData();
                   }}
                   placeholder="Enter value or formula..."
                 />
@@ -2975,9 +2947,6 @@ export default function Home() {
         columnSorting={true}
         dropdownMenu={true}
         stretchH="all"
-        formulas={{
-          engine: HyperFormula
-        }}
         afterSelectionEnd={(row, col) => {
           setSelectedCell({ row, col });
           setSelectedColumn(col);
@@ -3001,8 +2970,13 @@ export default function Home() {
             
             // If we have an open spreadsheet, update any dashboards that depend on it
             if (spreadsheetId) {
-              // Use debounced save to avoid write stream exhaustion
-              debouncedSaveAllSpreadsheetData();
+              // Wait a moment for state to update, then auto-save and update dashboards
+              setTimeout(() => {
+                autoSaveSpreadsheet().then(() => {
+                  
+                  updateDependentDashboards();
+                });
+              }, 300);
             }
           }
         }}
@@ -3775,4 +3749,3 @@ export default function Home() {
     </div>
   );
 }
-
