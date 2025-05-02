@@ -223,7 +223,7 @@ Try the live demo: [https://unifieddata.app](https://unifieddata.app)
 
 ## Contact
 
-For questions or support, please contact us at ishan.pathak2711@gmail.com or open an issue on GitHub.
+For questions or support, please contact us at ishan.pathak@unifieddata.app or open an issue on GitHub.
 
 ## License
 
