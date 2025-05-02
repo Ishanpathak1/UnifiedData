@@ -4,6 +4,10 @@
 
 UnifiedData is a modern web-based spreadsheet application with advanced data analysis capabilities. It combines the familiarity of spreadsheet interfaces with powerful analytics, matrix operations, and AI-powered insights, all within a collaborative environment.
 
+## Demo
+
+Try the live demo: [https://unifieddata.app](https://unifieddata.app)
+
 ## Features
 
 ### Core Spreadsheet Functionality
@@ -17,6 +21,19 @@ UnifiedData is a modern web-based spreadsheet application with advanced data ana
 - **Activity Tracking**: View last modified dates and recent changes
 - **Quick Actions**: Create new spreadsheets, import data, or access recent files
 - **User Statistics**: Track your usage and data analysis activities
+
+### Reports
+- **AI-Powered Report Generation**: Automatically generate comprehensive reports from your spreadsheet data using advanced AI algorithms.
+- **Report Types**:
+  - Executive summaries
+  - Key findings and insights
+  - Data quality analysis
+  - Statistical and predictive analysis
+  - Visualizations and charts
+- **Customizable Configuration**: Select which sheets and data to include, choose analysis types, and configure visualizations.
+- **Natural Language Insights**: Receive plain-English explanations and recommendations based on your data.
+- **Download & Share**: Export reports as PDF or share them with your team.
+- **Easy Access**: All generated reports are saved and accessible from the Reports page for future reference.
 
 ### AI-Powered Features
 - **Ask AI**: 
@@ -76,6 +93,13 @@ UnifiedData is a modern web-based spreadsheet application with advanced data ana
 1. Click "New Spreadsheet" on the dashboard
 2. Use the grid interface to enter data
 3. Changes are automatically saved to your account
+
+### Generating Reports
+1. Go to the **Reports** page from the main navigation.
+2. Click "Create Report" and select the spreadsheet and sheets you want to analyze.
+3. Configure the type of analysis, visualizations, and insights you want in the report.
+4. Click "Generate Report". The AI will analyze your data and produce a comprehensive report.
+5. View, download, or share the generated report from the Reports page.
 
 ### Using AI Features
 1. **Ask AI**:
