@@ -6,6 +6,9 @@ import { Chart as ChartJS } from 'chart.js/auto';
 import { Bar, Line, Pie, Scatter } from 'react-chartjs-2';
 import styles from '../styles/Reports.module.css';
 import ReportViewer from '../components/ReportViewer';
+import SignIn from '../components/auth/SignIn';
+import Head from 'next/head';
+import { useRouter } from 'next/router';
 
 const API_BASE_URL = 'https://unifieddata-api-552541459765.us-central1.run.app';
 
@@ -658,6 +661,7 @@ const DataPreview = ({ data }) => {
 
 const Reports = () => {
   const { user } = useAuth();
+  const router = useRouter();
   const [reports, setReports] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -670,6 +674,9 @@ const Reports = () => {
   const [currentReport, setCurrentReport] = useState(null);
   const [contextMenu, setContextMenu] = useState(null);
   const [selectedReportId, setSelectedReportId] = useState(null);
+
+  // Get current path for active nav state
+  const currentPath = router.pathname;
 
   useEffect(() => {
     if (user) {
@@ -865,96 +872,129 @@ const Reports = () => {
 
   return (
     <div className={styles.container}>
+      <Head>
+        <title>Reports | UnifiedData</title>
+      </Head>
+      
       <header className={styles.header}>
-        <h1>Reports</h1>
-        <button
-          className={styles.createButton}
-          onClick={() => setShowCreateModal(true)}
-        >
-          Create Report
-        </button>
+        <h1 className={styles.logo}>UnifiedData</h1>
+        <nav className={styles.nav}>
+          <button 
+            className={`${styles.navButton} ${currentPath === '/' ? styles.active : ''}`}
+            onClick={() => router.push('/')}
+          >
+            Spreadsheets
+          </button>
+          <button 
+            className={`${styles.navButton} ${currentPath === '/dashboard' ? styles.active : ''}`}
+            onClick={() => router.push('/dashboard')}
+          >
+            Dashboards
+          </button>
+          <button 
+            className={`${styles.navButton} ${currentPath === '/reports' ? styles.active : ''}`}
+            onClick={() => router.push('/reports')}
+          >
+            Reports
+          </button>
+        </nav>
+        <div className={styles.headerRight}>
+          <SignIn />
+        </div>
       </header>
 
-      {error && (
-        <div className={styles.error}>
-          {error}
-        </div>
-      )}
-
-      <div className={styles.reportsGrid}>
-        {reports.map((report) => (
-          <div 
-            key={report.id} 
-            className={styles.reportCard}
-            onContextMenu={(e) => handleContextMenu(e, report.id)}
+      <main className={styles.main}>
+        <div className={styles.actionsBar}>
+          <h2 className={styles.pageTitle}>Your Reports</h2>
+          <button
+            className={styles.createButton}
+            onClick={() => setShowCreateModal(true)}
           >
-            <div className={styles.reportHeader}>
-              <h3>{report.title}</h3>
-              <div className={styles.reportActions}>
-                <button
-                  onClick={() => setSelectedReport(report)}
-                  className={styles.actionButton}
-                >
-                  Open
-                </button>
-              </div>
-            </div>
-            
-            <p className={styles.reportDescription}>{report.description}</p>
-            <div className={styles.reportMeta}>
-              <span>Created: {formatDate(report.createdAt)}</span>
-              {report.sharedWith?.length > 0 && (
-                <span>Shared with {report.sharedWith.length} users</span>
-              )}
-            </div>
-          </div>
-        ))}
+            Create Report
+          </button>
+        </div>
 
-        {reports.length === 0 && (
-          <div className={styles.empty}>
-            No reports found. Create your first report to get started.
+        {error && (
+          <div className={styles.error}>
+            {error}
           </div>
         )}
-      </div>
 
-      {contextMenu && (
-        <div 
-          className={styles.contextMenu}
-          style={{
-            top: contextMenu.y,
-            left: contextMenu.x,
-          }}
-        >
-          <div 
-            className={`${styles.contextMenuItem} ${styles.delete}`}
-            onClick={handleDelete}
-          >
-            Delete Report
-          </div>
-        </div>
-      )}
-
-      {selectedReport && (
-        <div className={styles.reportViewerContainer}>
-          <div className={styles.reportViewerHeader}>
-            <h2>{selectedReport.title}</h2>
-            <button
-              onClick={() => setSelectedReport(null)}
-              className={styles.closeButton}
+        <div className={styles.reportsGrid}>
+          {reports.map((report) => (
+            <div 
+              key={report.id} 
+              className={styles.reportCard}
+              onContextMenu={(e) => handleContextMenu(e, report.id)}
             >
-              Close
-            </button>
-          </div>
-          <ReportViewer report={selectedReport} />
-        </div>
-      )}
+              <div className={styles.reportHeader}>
+                <h3>{report.title}</h3>
+                <div className={styles.reportActions}>
+                  <button
+                    onClick={() => setSelectedReport(report)}
+                    className={styles.actionButton}
+                  >
+                    Open
+                  </button>
+                </div>
+              </div>
+              
+              <p className={styles.reportDescription}>{report.description}</p>
+              <div className={styles.reportMeta}>
+                <span>Created: {formatDate(report.createdAt)}</span>
+                {report.sharedWith?.length > 0 && (
+                  <span>Shared with {report.sharedWith.length} users</span>
+                )}
+              </div>
+            </div>
+          ))}
 
-      {showCreateModal && (
-        <CreateReportModal
-          onClose={() => setShowCreateModal(false)}
-          onSubmit={handleCreateReport}
-        />
-      )}
+          {reports.length === 0 && (
+            <div className={styles.empty}>
+              No reports found. Create your first report to get started.
+            </div>
+          )}
+        </div>
+
+        {contextMenu && (
+          <div 
+            className={styles.contextMenu}
+            style={{
+              top: contextMenu.y,
+              left: contextMenu.x,
+            }}
+          >
+            <div 
+              className={`${styles.contextMenuItem} ${styles.delete}`}
+              onClick={handleDelete}
+            >
+              Delete Report
+            </div>
+          </div>
+        )}
+
+        {selectedReport && (
+          <div className={styles.reportViewerContainer}>
+            <div className={styles.reportViewerHeader}>
+              <h2>{selectedReport.title}</h2>
+              <button
+                onClick={() => setSelectedReport(null)}
+                className={styles.closeButton}
+              >
+                Close
+              </button>
+            </div>
+            <ReportViewer report={selectedReport} />
+          </div>
+        )}
+
+        {showCreateModal && (
+          <CreateReportModal
+            onClose={() => setShowCreateModal(false)}
+            onSubmit={handleCreateReport}
+          />
+        )}
+      </main>
     </div>
   );
 };

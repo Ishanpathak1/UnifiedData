@@ -7,6 +7,7 @@ import styles from '../../styles/Dashboard.module.css';
 import Head from 'next/head';
 import ContextMenu from '../../components/ContextMenu';
 import DeleteConfirmModal from '../../components/DeleteConfirmModal';
+import SignIn from '../../components/auth/SignIn';
 
 export default function Dashboards() {
   const [dashboards, setDashboards] = useState([]);
@@ -17,6 +18,9 @@ export default function Dashboards() {
   // Add state for context menu and delete modal
   const [contextMenu, setContextMenu] = useState(null);
   const [deleteModal, setDeleteModal] = useState({ isOpen: false, dashboard: null });
+
+  // Get current path for active nav state
+  const currentPath = router.pathname;
 
   useEffect(() => {
     if (loading) return;
@@ -133,21 +137,32 @@ export default function Dashboards() {
       </Head>
       
       <header className={styles.header}>
-        <h1 className={styles.logo}>UnifiedData</h1>
+        <div className={styles.headerLeft}>
+          <h1 className={styles.logo}>UnifiedData</h1>
+        </div>
         <nav className={styles.nav}>
           <button 
-            className={styles.navButton}
+            className={`${styles.navButton} ${currentPath === '/' ? styles.active : ''}`}
             onClick={() => router.push('/')}
           >
             Spreadsheets
           </button>
           <button 
-            className={`${styles.navButton} ${styles.active}`}
+            className={`${styles.navButton} ${currentPath === '/dashboard' ? styles.active : ''}`}
             onClick={() => router.push('/dashboard')}
           >
             Dashboards
           </button>
+          <button 
+            className={`${styles.navButton} ${currentPath === '/reports' ? styles.active : ''}`}
+            onClick={() => router.push('/reports')}
+          >
+            Reports
+          </button>
         </nav>
+        <div className={styles.headerRight}>
+          <SignIn />
+        </div>
       </header>
       
       <main className={styles.main}>

@@ -37,6 +37,9 @@ export default function Home() {
   const [deleteModal, setDeleteModal] = useState({ isOpen: false, spreadsheet: null });
   const router = useRouter();
 
+  // Get current path for active nav state
+  const currentPath = router.pathname;
+
   // Function to fetch spreadsheets
   const fetchSpreadsheets = async () => {
     if (!user) return;
@@ -150,16 +153,22 @@ export default function Home() {
         <h1 className={styles.logo}>UnifiedData</h1>
         <nav className={styles.nav}>
           <button 
-            className={`${styles.navButton} ${styles.active}`}
+            className={`${styles.navButton} ${currentPath === '/' ? styles.active : ''}`}
             onClick={() => router.push('/')}
           >
             Spreadsheets
           </button>
           <button 
-            className={styles.navButton}
+            className={`${styles.navButton} ${currentPath === '/dashboard' ? styles.active : ''}`}
             onClick={() => router.push('/dashboard')}
           >
             Dashboards
+          </button>
+          <button 
+            className={`${styles.navButton} ${currentPath === '/reports' ? styles.active : ''}`}
+            onClick={() => router.push('/reports')}
+          >
+            Reports
           </button>
         </nav>
         <div className={styles.headerRight}>
