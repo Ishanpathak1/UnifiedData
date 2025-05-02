@@ -72,6 +72,20 @@
   align-items: center;
 }
 
+.headerRight > * {
+  margin-right: 0.5rem;
+}
+
+.headerRight > *:last-child {
+  margin-right: 0;
+}
+
+.aiButton, .saveButton, .updateDashboardsButton {
+  min-width: 120px;
+  min-height: 40px;
+  box-sizing: border-box;
+}
+
 .aiButton, .saveButton {
   display: flex;
   align-items: center;
@@ -115,9 +129,11 @@
   cursor: not-allowed;
 }
 
-.saveIcon {
+.saveIcon, .updateDashboardsButton svg {
   width: 1rem;
   height: 1rem;
+  display: inline-block;
+  vertical-align: middle;
 }
 
 .buttonSpinner {
@@ -899,4 +915,39 @@
 
 .fileInput {
   display: none;
+}
+
+.updateDashboardsButton {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background-color: white;
+  color: #111827;
+  border: 1px solid #E5E7EB;
+  border-radius: 0.375rem;
+  padding: 0.5rem 1rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.updateDashboardsButton:hover:not(:disabled) {
+  background-color: #F3F4F6;
+  border-color: #D1D5DB;
+  color: #111827;
+}
+
+.updateDashboardsButton:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.updateDashboardsSpinner {
+  width: 1rem;
+  height: 1rem;
+  border: 2px solid #E5E7EB;
+  border-top: 2px solid #4F46E5;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
 }
