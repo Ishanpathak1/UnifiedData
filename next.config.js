@@ -1,4 +1,4 @@
-const isDev = process.env.NODE_ENV === 'development'
+const isDev = process.env.NODE_ENV === 'development';
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
@@ -18,32 +18,34 @@ const nextConfig = {
     ];
   },
   webpack: (config) => {
-    // Optimize chunking
+    // Optimize chunking with safe match
     config.optimization.splitChunks.cacheGroups = {
       ...config.optimization.splitChunks.cacheGroups,
       vendor: {
         test: /[\\/]node_modules[\\/]/,
         name(module) {
-          const packageName = module.context.match(/[\\/]node_modules[\\/](.*?)([\\/]|$)/)[1];
-          
-          // Create separate chunks for large dependencies
+          const match =
+            module?.context?.match(/[\\/]node_modules[\\/](.*?)([\\/]|$)/);
+          const packageName = match ? match[1] : null;
+
           if (/handsontable|hyperformula/.test(packageName)) {
             return 'spreadsheet-vendor';
           }
           if (/firebase/.test(packageName)) {
             return 'firebase-vendor';
           }
-          
+
           return 'vendor';
         },
         priority: 20,
         chunks: 'all',
-      }
+      },
     };
-    
+
     return config;
   },
 };
 
 module.exports = nextConfig;
+
 
