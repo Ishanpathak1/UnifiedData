@@ -2934,7 +2934,7 @@ export default function Home() {
       <HotTable
         ref={hotRef}
         data={data}
-        colHeaders={data.length > 0 ? data[0] : true}
+        colHeaders={true}
         rowHeaders={true}
         width="100%"
         height="calc(100% - 40px)" /* Make room for tabs */
