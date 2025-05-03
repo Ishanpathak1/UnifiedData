@@ -38,7 +38,11 @@ app = FastAPI()
 # Configure CORS to allow requests from your frontend
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Allow all origins for testing
+    allow_origins=[
+        "https://unifieddata.app",
+        "https://www.unifieddata.app",
+        "http://localhost:3000"
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -991,83 +995,87 @@ async def predict_outcome(data: dict):
         raise HTTPException(status_code=500, detail=str(e))
 
 # AI query endpoint
+from fastapi.responses import JSONResponse
+import traceback
+import json
+from scipy.stats import pearsonr
+import numpy as np
+
 @app.post("/api/ask")
 async def ask_ai(request: Request):
-    data = await request.json()
-    query = data.get("query")
-    spreadsheet_data = data.get("data")
-    
-    if not query or not spreadsheet_data:
-        return {"error": "Missing query or spreadsheet data"}
+    try:
+        data = await request.json()
+        query = data.get("query")
+        spreadsheet_data = data.get("data")
 
-    # Extract headers (first row)
-    headers = spreadsheet_data[0] if spreadsheet_data and len(spreadsheet_data) > 0 else []
-    
-    # Calculate comprehensive statistics for all columns
-    column_stats = {}
-    for col_idx, header in enumerate(headers):
-        try:
-            # Extract values for this column
-            values = [row[col_idx] for row in spreadsheet_data[1:] if col_idx < len(row) and row[col_idx] != '']
-            
-            if not values:
-                continue
-                
-            # Try to convert to numeric if possible
-            numeric_values = []
-            for val in values:
-                try:
-                    num_val = float(str(val).replace(',', ''))
-                    numeric_values.append(num_val)
-                except (ValueError, TypeError):
-                    pass
-            
-            # Calculate statistics
-            stats = {
-                "count": len(values),
-                "unique": len(set(values)),
-                "missing": len(spreadsheet_data[1:]) - len(values)
-            }
-            
-            if numeric_values:
-                stats.update({
-                    "min": min(numeric_values),
-                    "max": max(numeric_values),
-                    "mean": sum(numeric_values) / len(numeric_values),
-                    "median": sorted(numeric_values)[len(numeric_values)//2],
-                    "std": np.std(numeric_values) if len(numeric_values) > 1 else 0
-                })
-            
-            column_stats[header] = stats
-            
-        except Exception as e:
-            print(f"Error processing column {header}: {str(e)}")
-            continue
-    
-    # Calculate correlations between numeric columns
-    correlations = {}
-    numeric_columns = {h: [] for h, s in column_stats.items() if "mean" in s}
-    
-    if len(numeric_columns) >= 2:
+        if not query or not spreadsheet_data:
+            return JSONResponse(
+                content={"error": "Missing query or spreadsheet data"},
+                status_code=400,
+                headers={"Access-Control-Allow-Origin": "*"}
+            )
+
+        headers = spreadsheet_data[0] if spreadsheet_data and len(spreadsheet_data) > 0 else []
+
+        column_stats = {}
         for col_idx, header in enumerate(headers):
-            if header in numeric_columns:
-                try:
-                    values = [float(row[col_idx]) for row in spreadsheet_data[1:] 
-                             if col_idx < len(row) and row[col_idx] != '']
-                    numeric_columns[header] = values
-                except:
+            try:
+                values = [row[col_idx] for row in spreadsheet_data[1:] if col_idx < len(row) and row[col_idx] != '']
+                if not values:
                     continue
-        
-        # Calculate correlations
-        for col1 in numeric_columns:
-            correlations[col1] = {}
-            for col2 in numeric_columns:
-                if col1 != col2:
-                    corr, _ = pearsonr(numeric_columns[col1], numeric_columns[col2])
-                    correlations[col1][col2] = corr
-    
-    # Format the prompt with comprehensive statistics
-    prompt = f"""
+                numeric_values = []
+                for val in values:
+                    try:
+                        num_val = float(str(val).replace(',', ''))
+                        numeric_values.append(num_val)
+                    except (ValueError, TypeError):
+                        pass
+
+                stats = {
+                    "count": len(values),
+                    "unique": len(set(values)),
+                    "missing": len(spreadsheet_data[1:]) - len(values)
+                }
+
+                if numeric_values:
+                    stats.update({
+                        "min": min(numeric_values),
+                        "max": max(numeric_values),
+                        "mean": sum(numeric_values) / len(numeric_values),
+                        "median": sorted(numeric_values)[len(numeric_values)//2],
+                        "std": np.std(numeric_values) if len(numeric_values) > 1 else 0
+                    })
+
+                column_stats[header] = stats
+
+            except Exception as e:
+                print(f"Error processing column {header}: {str(e)}")
+                continue
+
+        correlations = {}
+        numeric_columns = {h: [] for h, s in column_stats.items() if "mean" in s}
+
+        if len(numeric_columns) >= 2:
+            for col_idx, header in enumerate(headers):
+                if header in numeric_columns:
+                    try:
+                        values = [float(row[col_idx]) for row in spreadsheet_data[1:] 
+                                 if col_idx < len(row) and row[col_idx] != '']
+                        numeric_columns[header] = values
+                    except:
+                        continue
+
+            for col1 in numeric_columns:
+                correlations[col1] = {}
+                for col2 in numeric_columns:
+                    if col1 != col2:
+                        try:
+                            corr, _ = pearsonr(numeric_columns[col1], numeric_columns[col2])
+                            correlations[col1][col2] = corr
+                        except:
+                            correlations[col1][col2] = None
+
+        prompt = f"""
 Here is a comprehensive analysis of a dataset with {len(spreadsheet_data)} rows and {len(headers)} columns.
 
 Column Statistics:
@@ -1084,14 +1092,24 @@ If the answer involves identifying trends or patterns, use the correlation analy
 If you need more specific data to answer accurately, explain what additional information would be helpful.
 """
 
-    try:
         response = openai.chat.completions.create(
             model="gpt-4",
             messages=[{"role": "user", "content": prompt}]
         )
-        return {"answer": response.choices[0].message.content}
+
+        return JSONResponse(
+            content={"answer": response.choices[0].message.content},
+            headers={"Access-Control-Allow-Origin": "*"}
+        )
+
     except Exception as e:
-        return {"error": str(e)}
+        traceback.print_exc()
+        return JSONResponse(
+            content={"error": str(e)},
+            status_code=500,
+            headers={"Access-Control-Allow-Origin": "*"}
+        )
+
 
 @app.post("/api/data-cleaning")
 async def analyze_data_for_cleaning(request: Request):
