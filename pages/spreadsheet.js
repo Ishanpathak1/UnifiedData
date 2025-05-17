@@ -17,6 +17,7 @@ import PCAAnalysisPanel from '../components/PCAAnalysisPanel';
 import CorrelationAnalysisPanel from '../components/CorrelationAnalysisPanel';
 import TimeSeriesForecastPanel from '../components/TimeSeriesForecastPanel';
 import RegressionAnalysisPanel from '../components/RegressionAnalysisPanel';
+import DataSelector from '../components/DataSelector';
 import { useRouter } from 'next/router';
 import { 
   collection, 
@@ -265,6 +266,8 @@ export default function Home() {
 
   // Add this at the top level of your component, with other state variables
   const titleChangeRef = useRef(false);
+
+  const [showDataSelectorPanel, setShowDataSelectorPanel] = useState(false);
 
   // Import file handler
   const handleFileImport = (file) => {
@@ -2781,106 +2784,12 @@ export default function Home() {
             <span>Clean Data</span>
           </button>
           
-          {showCleaningTools && (
-            <div className={styles.dropdownMenu}>
-              <button 
-                className={styles.dropdownItem}
-                onClick={() => {
-                  if (!hotRef.current || selectedColumn === null) return;
-                  
-                  const hot = hotRef.current.hotInstance;
-                  const newData = [...data];
-                  
-                  // Remove empty rows
-                  for (let row = 1; row < newData.length; row++) {
-                    if (newData[row][selectedColumn] === '') {
-                      newData[row][selectedColumn] = null;
-                    }
-                  }
-                  
-                  setData(newData);
-                  hot.loadData(newData);
-                }}
-              >
-                Remove Empty Cells
-              </button>
-              <button 
-                className={styles.dropdownItem}
-                onClick={() => {
-                  if (!hotRef.current || selectedColumn === null) return;
-                  
-                  const hot = hotRef.current.hotInstance;
-                  const newData = [...data];
-                  const columnData = newData.slice(1).map(row => row[selectedColumn]);
-                  
-                  // Get numeric values
-                  const numericValues = columnData
-                    .filter(val => val !== null && val !== '' && !isNaN(parseFloat(val)))
-                    .map(val => parseFloat(val));
-                  
-                  if (numericValues.length === 0) {
-                    alert('No numeric values found in this column');
-                    return;
-                  }
-                  
-                  // Calculate mean and standard deviation
-                  const mean = numericValues.reduce((sum, val) => sum + val, 0) / numericValues.length;
-                  const stdDev = Math.sqrt(
-                    numericValues.map(val => Math.pow(val - mean, 2))
-                      .reduce((sum, val) => sum + val, 0) / numericValues.length
-                  );
-                  
-                  // Remove outliers (values more than 2 standard deviations from mean)
-                  for (let row = 1; row < newData.length; row++) {
-                    const val = parseFloat(newData[row][selectedColumn]);
-                    if (!isNaN(val) && Math.abs(val - mean) > 2 * stdDev) {
-                      newData[row][selectedColumn] = null;
-                    }
-                  }
-                  
-                  setData(newData);
-                  hot.loadData(newData);
-                }}
-              >
-                Remove Outliers
-              </button>
-              <button 
-                className={styles.dropdownItem}
-                onClick={() => {
-                  if (!hotRef.current || selectedColumn === null) return;
-                  
-                  const hot = hotRef.current.hotInstance;
-                  const newData = [...data];
-                  const columnData = newData.slice(1).map(row => row[selectedColumn]);
-                  
-                  // Get numeric values
-                  const numericValues = columnData
-                    .filter(val => val !== null && val !== '' && !isNaN(parseFloat(val)))
-                    .map(val => parseFloat(val));
-                  
-                  if (numericValues.length === 0) {
-                    alert('No numeric values found in this column');
-                    return;
-                  }
-                  
-                  // Calculate mean
-                  const mean = numericValues.reduce((sum, val) => sum + val, 0) / numericValues.length;
-                  
-                  // Fill missing values with mean
-                  for (let row = 1; row < newData.length; row++) {
-                    if (newData[row][selectedColumn] === '' || newData[row][selectedColumn] === null) {
-                      newData[row][selectedColumn] = mean.toFixed(2);
-                    }
-                  }
-                  
-                  setData(newData);
-                  hot.loadData(newData);
-                }}
-              >
-                Fill Missing Values
-              </button>
-            </div>
-          )}
+          <button 
+            className={styles.toolbarButton}
+            onClick={() => setShowDataSelectorPanel(true)}
+          >
+            <span>Data Selector</span>
+          </button>
           <button 
             className={styles.toolbarButton}
             onClick={() => setShowTemplates(!showTemplates)}
@@ -3746,6 +3655,17 @@ export default function Home() {
         sheetData={data}
         applyChanges={applyDataCleaningChanges}
       />
+
+      {/* DataSelector Panel */}
+      {showDataSelectorPanel && (
+        <div className={styles.modalOverlay}>
+          <DataSelector
+            data={data}
+            hotRef={hotRef}
+            onClose={() => setShowDataSelectorPanel(false)}
+          />
+        </div>
+      )}
     </div>
   );
 }
