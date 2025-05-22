@@ -163,7 +163,8 @@ Try the live demo: [https://unifieddata.app](https://unifieddata.app)
 - **Styling**: CSS Modules and custom theming system
 
 ### Backend
-- **API Framework**: FastAPI for high-performance Python backend
+- **API Framework**: FastAPI for high-performance Python backend (standalone service)
+- **Deployment**: Google Cloud Run for containerized backend deployment
 - **Database**: Firebase Firestore for real-time data storage
 - **Authentication**: Firebase Auth for user management
 - **AI Integration**: OpenAI GPT-4 for intelligent data analysis
@@ -196,9 +197,9 @@ Try the live demo: [https://unifieddata.app](https://unifieddata.app)
 
 3. Install backend dependencies:
    ```bash
-   cd pages/api
+   cd backend
    pip install -r requirements.txt
-   cd ../..
+   cd ..
    ```
 
 4. Set up environment variables:
@@ -213,13 +214,49 @@ Try the live demo: [https://unifieddata.app](https://unifieddata.app)
    OPENAI_API_KEY=your-openai-api-key
    ```
 
-5. Run the development server:
+5. Start the backend server:
+   ```bash
+   cd backend
+   uvicorn main:app --reload
+   ```
+
+6. In a new terminal window, run the frontend development server:
    ```bash
    npm run dev
    ```
 
-6. Open [http://localhost:3000](http://localhost:3000) with your browser to see the application.
+7. Open [http://localhost:3000](http://localhost:3000) with your browser to see the application.
 
+## Deployment
+
+### Backend Deployment to Google Cloud Run
+
+1. Make sure you have the Google Cloud SDK installed and configured:
+   ```bash
+   gcloud auth login
+   gcloud config set project your-project-id
+   ```
+
+2. Build and push your backend Docker image to Google Container Registry:
+   ```bash
+   cd backend
+   gcloud builds submit --tag gcr.io/your-project-id/unifieddata-api
+   ```
+
+3. Deploy the container to Google Cloud Run:
+   ```bash
+   gcloud run deploy unifieddata-api \
+     --image gcr.io/your-project-id/unifieddata-api \
+     --platform managed \
+     --region us-central1 \
+     --allow-unauthenticated
+   ```
+
+4. Note the provided URL for your backend service. Update your frontend configuration to use this URL for API calls.
+
+### Frontend Deployment
+
+Deploy the Next.js frontend to Vercel or another hosting provider of your choice. Make sure to set the environment variables to point to your deployed backend API.
 
 ## Contact
 
