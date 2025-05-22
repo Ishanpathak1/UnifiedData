@@ -10,7 +10,10 @@ import SignIn from '../components/auth/SignIn';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
 
-const API_BASE_URL = 'https://unifieddata-api-552541459765.us-central1.run.app';
+// Dynamically set API base URL based on environment
+const API_BASE_URL = typeof window !== 'undefined' && window.location.hostname === 'localhost'
+  ? 'http://localhost:8000'
+  : 'https://unifieddata-api-552541459765.us-central1.run.app';
 
 // Chart.js default styles
 ChartJS.defaults.color = '#6B7280';
@@ -47,6 +50,27 @@ const formatDate = (timestamp) => {
   });
 };
 
+// Add a function to check the OpenAI API status
+const checkOpenAIStatus = async () => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/openai-status`);
+    const result = await response.json();
+    
+    return {
+      status: result.status === 'active',
+      message: result.message,
+      solution: result.solution
+    };
+  } catch (error) {
+    console.error("Error checking OpenAI API status:", error);
+    return {
+      status: false,
+      message: "Could not connect to API service",
+      solution: "Check if the backend server is running and accessible"
+    };
+  }
+};
+
 // Separate CreateReportModal component
 const CreateReportModal = ({ onClose, onSubmit }) => {
   const { user } = useAuth();
@@ -56,6 +80,7 @@ const CreateReportModal = ({ onClose, onSubmit }) => {
   const [fetchingSheets, setFetchingSheets] = useState(true);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [apiStatus, setApiStatus] = useState(null);
   
   // Form state
   const [title, setTitle] = useState('');
@@ -132,6 +157,16 @@ const CreateReportModal = ({ onClose, onSubmit }) => {
       fetchSpreadsheets();
     }
   }, [user]);
+
+  // Check OpenAI API status when modal opens
+  useEffect(() => {
+    const checkApiStatus = async () => {
+      const status = await checkOpenAIStatus();
+      setApiStatus(status);
+    };
+    
+    checkApiStatus();
+  }, []);
 
   const handleSpreadsheetSelect = (spreadsheetId) => {
     const selected = spreadsheets.find(s => s.id === spreadsheetId);
@@ -224,6 +259,16 @@ const CreateReportModal = ({ onClose, onSubmit }) => {
       console.log('Selected Spreadsheet:', selectedSpreadsheet);
       console.log('Selected Sheets:', selectedSheets);
 
+      // Validate AI analysis configuration
+      if (config.ai_analysis) {
+        // Make sure at least one AI analysis option is enabled
+        const hasEnabledAIOption = Object.values(config.ai_analysis).some(value => value === true);
+        if (!hasEnabledAIOption) {
+          console.warn('No AI analysis options are enabled. Setting insights to true as default.');
+          config.ai_analysis.insights = true;
+        }
+      }
+
       const reportRequest = {
         title: title.trim() || 'Untitled Report',
         description: description.trim() || 'Generated report',
@@ -235,63 +280,62 @@ const CreateReportModal = ({ onClose, onSubmit }) => {
           selected_columns: null,
           data_range: null
         })),
-        config: {
-          data_quality: {
-            missing_values: true,
-            type_detection: true,
-            anomaly_detection: true
-          },
-          statistical_analysis: {
-            correlation: true,
-            correlation_method: "pearson",
-            basic_stats: true
-          },
-          predictive_analysis: {
-            regression: false,
-            regression_type: "linear",
-            forecast: false,
-            forecast_periods: 7
-          },
-          visualizations: [
-            {
-              type: "line",
-              columns: ["all"]
-            },
-            {
-              type: "bar",
-              columns: ["all"]
-            }
-          ],
-          ai_analysis: {
-            trends: true,
-            insights: true,
-            recommendations: true
-          }
-        },
+        config: config,
         user_id: user.uid
       };
 
       // Log the request for debugging
       console.log('Sending report request:', JSON.stringify(reportRequest, null, 2));
 
-      const response = await fetch('https://unifieddata-api-552541459765.us-central1.run.app/api/reports/generate', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(reportRequest)
-      });
+      const apiUrl = API_BASE_URL + '/api/reports/generate';
+      
+      console.log(`Sending request to: ${apiUrl}`);
+      
+      // Implement timeout to avoid hanging requests
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 60000); // 60 second timeout
+      
+      try {
+        const response = await fetch(apiUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(reportRequest),
+          signal: controller.signal
+        });
+        
+        clearTimeout(timeoutId);
+        
+        const responseText = await response.text();
+        let result;
+        
+        try {
+          result = JSON.parse(responseText);
+        } catch (jsonError) {
+          console.error('Error parsing JSON response:', jsonError);
+          console.log('Raw response:', responseText);
+          throw new Error(`Invalid response format: ${responseText.substring(0, 100)}...`);
+        }
+        
+        if (!response.ok) {
+          console.error('API Error Response:', result);
+          throw new Error(`API error: ${result.error || result.message || JSON.stringify(result)}`);
+        }
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        console.error('API Error Response:', errorData);
-        throw new Error(`API error: ${JSON.stringify(errorData)}`);
+        console.log('Report generation successful:', result);
+        
+        // AI insights are working correctly, no need to add error messages
+        // Just submit the result as is
+        onSubmit(result);
+        onClose();
+      } catch (fetchError) {
+        clearTimeout(timeoutId);
+        if (fetchError.name === 'AbortError') {
+          throw new Error('Request timed out. The server took too long to respond.');
+        }
+        throw fetchError;
       }
-
-      const result = await response.json();
-      console.log('Report generation successful:', result);
-      onSubmit(result);
-      onClose();
     } catch (error) {
       console.error('Error generating report:', error);
       setError(error.message);
@@ -418,123 +462,137 @@ const CreateReportModal = ({ onClose, onSubmit }) => {
           </div>
 
           <div className={styles.formSection}>
-            <h3>Analysis Configuration</h3>
+            <h3>Report Configuration</h3>
             
-            {/* Data Quality */}
-            <div className={styles.configGroup}>
-              <h4>Data Quality Checks</h4>
-              <label className={styles.checkboxLabel}>
-                <input
-                  type="checkbox"
-                  checked={config.data_quality.missing_values}
-                  onChange={(e) => handleConfigChange('data_quality', 'missing_values', e.target.checked)}
-                  disabled={loading}
-                />
-                Check Missing Values
-              </label>
-              <label className={styles.checkboxLabel}>
-                <input
-                  type="checkbox"
-                  checked={config.data_quality.type_detection}
-                  onChange={(e) => handleConfigChange('data_quality', 'type_detection', e.target.checked)}
-                  disabled={loading}
-                />
-                Detect Data Types
-              </label>
-              <label className={styles.checkboxLabel}>
-                <input
-                  type="checkbox"
-                  checked={config.data_quality.anomaly_detection}
-                  onChange={(e) => handleConfigChange('data_quality', 'anomaly_detection', e.target.checked)}
-                  disabled={loading}
-                />
-                Detect Anomalies
-              </label>
+            {/* Only show warning if explicitly debugging API issues */}
+            {false && apiStatus && !apiStatus.status && (
+              <div className={styles.apiWarning}>
+                <h4>⚠️ OpenAI API Status Warning</h4>
+                <p>{apiStatus.message}</p>
+                {apiStatus.solution && (
+                  <p className={styles.apiSolution}><strong>Solution:</strong> {apiStatus.solution}</p>
+                )}
+                <p>AI insights may not be generated for your report.</p>
+              </div>
+            )}
+            
+            <div className={styles.configSection}>
+              <h4>Data Quality Analysis</h4>
+              <div className={styles.checkboxGroup}>
+                <label className={styles.checkboxLabel}>
+                  <input
+                    type="checkbox"
+                    checked={config.data_quality.missing_values}
+                    onChange={(e) => handleConfigChange('data_quality', 'missing_values', e.target.checked)}
+                    disabled={loading}
+                  />
+                  Check Missing Values
+                </label>
+                <label className={styles.checkboxLabel}>
+                  <input
+                    type="checkbox"
+                    checked={config.data_quality.type_detection}
+                    onChange={(e) => handleConfigChange('data_quality', 'type_detection', e.target.checked)}
+                    disabled={loading}
+                  />
+                  Detect Data Types
+                </label>
+                <label className={styles.checkboxLabel}>
+                  <input
+                    type="checkbox"
+                    checked={config.data_quality.anomaly_detection}
+                    onChange={(e) => handleConfigChange('data_quality', 'anomaly_detection', e.target.checked)}
+                    disabled={loading}
+                  />
+                  Detect Anomalies
+                </label>
+              </div>
             </div>
 
-            {/* Statistical Analysis */}
-            <div className={styles.configGroup}>
+            <div className={styles.configSection}>
               <h4>Statistical Analysis</h4>
-              <label className={styles.checkboxLabel}>
-                <input
-                  type="checkbox"
-                  checked={config.statistical_analysis.basic_stats}
-                  onChange={(e) => handleConfigChange('statistical_analysis', 'basic_stats', e.target.checked)}
-                  disabled={loading}
-                />
-                Basic Statistics
-              </label>
-              <label className={styles.checkboxLabel}>
-                <input
-                  type="checkbox"
-                  checked={config.statistical_analysis.correlation}
-                  onChange={(e) => handleConfigChange('statistical_analysis', 'correlation', e.target.checked)}
-                  disabled={loading}
-                />
-                Correlation Analysis
-              </label>
-              {config.statistical_analysis.correlation && (
-                <select
-                  value={config.statistical_analysis.correlation_method}
-                  onChange={(e) => handleConfigChange('statistical_analysis', 'correlation_method', e.target.value)}
-                  disabled={loading}
-                  className={styles.select}
-                >
-                  <option value="pearson">Pearson</option>
-                  <option value="spearman">Spearman</option>
-                  <option value="kendall">Kendall</option>
-                </select>
-              )}
+              <div className={styles.checkboxGroup}>
+                <label className={styles.checkboxLabel}>
+                  <input
+                    type="checkbox"
+                    checked={config.statistical_analysis.basic_stats}
+                    onChange={(e) => handleConfigChange('statistical_analysis', 'basic_stats', e.target.checked)}
+                    disabled={loading}
+                  />
+                  Basic Statistics
+                </label>
+                <label className={styles.checkboxLabel}>
+                  <input
+                    type="checkbox"
+                    checked={config.statistical_analysis.correlation}
+                    onChange={(e) => handleConfigChange('statistical_analysis', 'correlation', e.target.checked)}
+                    disabled={loading}
+                  />
+                  Correlation Analysis
+                </label>
+                {config.statistical_analysis.correlation && (
+                  <select
+                    value={config.statistical_analysis.correlation_method}
+                    onChange={(e) => handleConfigChange('statistical_analysis', 'correlation_method', e.target.value)}
+                    disabled={loading}
+                    className={styles.select}
+                  >
+                    <option value="pearson">Pearson</option>
+                    <option value="spearman">Spearman</option>
+                    <option value="kendall">Kendall</option>
+                  </select>
+                )}
+              </div>
             </div>
 
-            {/* Predictive Analysis */}
-            <div className={styles.configGroup}>
+            <div className={styles.configSection}>
               <h4>Predictive Analysis</h4>
-              <label className={styles.checkboxLabel}>
-                <input
-                  type="checkbox"
-                  checked={config.predictive_analysis.regression}
-                  onChange={(e) => handleConfigChange('predictive_analysis', 'regression', e.target.checked)}
-                  disabled={loading}
-                />
-                Regression Analysis
-              </label>
-              {config.predictive_analysis.regression && (
-                <select
-                  value={config.predictive_analysis.regression_type}
-                  onChange={(e) => handleConfigChange('predictive_analysis', 'regression_type', e.target.value)}
-                  disabled={loading}
-                  className={styles.select}
-                >
-                  <option value="linear">Linear</option>
-                  <option value="polynomial">Polynomial</option>
-                  <option value="logistic">Logistic</option>
-                </select>
-              )}
-              <label className={styles.checkboxLabel}>
-                <input
-                  type="checkbox"
-                  checked={config.predictive_analysis.forecast}
-                  onChange={(e) => handleConfigChange('predictive_analysis', 'forecast', e.target.checked)}
-                  disabled={loading}
-                />
-                Time Series Forecast
-              </label>
-              {config.predictive_analysis.forecast && (
-                <input
-                  type="number"
-                  value={config.predictive_analysis.forecast_periods}
-                  onChange={(e) => handleConfigChange('predictive_analysis', 'forecast_periods', parseInt(e.target.value))}
-                  min="1"
-                  max="30"
-                  disabled={loading}
-                  className={styles.input}
-                />
-              )}
+              <div className={styles.checkboxGroup}>
+                <label className={styles.checkboxLabel}>
+                  <input
+                    type="checkbox"
+                    checked={config.predictive_analysis.regression}
+                    onChange={(e) => handleConfigChange('predictive_analysis', 'regression', e.target.checked)}
+                    disabled={loading}
+                  />
+                  Regression Analysis
+                </label>
+                {config.predictive_analysis.regression && (
+                  <select
+                    value={config.predictive_analysis.regression_type}
+                    onChange={(e) => handleConfigChange('predictive_analysis', 'regression_type', e.target.value)}
+                    disabled={loading}
+                    className={styles.select}
+                  >
+                    <option value="linear">Linear</option>
+                    <option value="polynomial">Polynomial</option>
+                    <option value="logistic">Logistic</option>
+                  </select>
+                )}
+                <label className={styles.checkboxLabel}>
+                  <input
+                    type="checkbox"
+                    checked={config.predictive_analysis.forecast}
+                    onChange={(e) => handleConfigChange('predictive_analysis', 'forecast', e.target.checked)}
+                    disabled={loading}
+                  />
+                  Time Series Forecast
+                </label>
+                {config.predictive_analysis.forecast && (
+                  <input
+                    type="number"
+                    value={config.predictive_analysis.forecast_periods}
+                    onChange={(e) => handleConfigChange('predictive_analysis', 'forecast_periods', parseInt(e.target.value))}
+                    min="1"
+                    max="30"
+                    disabled={loading}
+                    className={styles.input}
+                  />
+                )}
+              </div>
             </div>
 
-            {/* Visualizations */}
-            <div className={styles.configGroup}>
+            <div className={styles.configSection}>
               <h4>Visualizations</h4>
               {config.visualizations.map((viz, index) => (
                 <div key={index} className={styles.visualizationItem}>
@@ -569,36 +627,37 @@ const CreateReportModal = ({ onClose, onSubmit }) => {
               </button>
             </div>
 
-            {/* AI Analysis */}
-            <div className={styles.configGroup}>
+            <div className={styles.configSection}>
               <h4>AI Analysis</h4>
-              <label className={styles.checkboxLabel}>
-                <input
-                  type="checkbox"
-                  checked={config.ai_analysis.trends}
-                  onChange={(e) => handleConfigChange('ai_analysis', 'trends', e.target.checked)}
-                  disabled={loading}
-                />
-                Trend Analysis
-              </label>
-              <label className={styles.checkboxLabel}>
-                <input
-                  type="checkbox"
-                  checked={config.ai_analysis.insights}
-                  onChange={(e) => handleConfigChange('ai_analysis', 'insights', e.target.checked)}
-                  disabled={loading}
-                />
-                Generate Insights
-              </label>
-              <label className={styles.checkboxLabel}>
-                <input
-                  type="checkbox"
-                  checked={config.ai_analysis.recommendations}
-                  onChange={(e) => handleConfigChange('ai_analysis', 'recommendations', e.target.checked)}
-                  disabled={loading}
-                />
-                Generate Recommendations
-              </label>
+              <div className={styles.checkboxGroup}>
+                <label className={styles.checkboxLabel}>
+                  <input
+                    type="checkbox"
+                    checked={config.ai_analysis.trends}
+                    onChange={(e) => handleConfigChange('ai_analysis', 'trends', e.target.checked)}
+                    disabled={loading}
+                  />
+                  Trend Analysis
+                </label>
+                <label className={styles.checkboxLabel}>
+                  <input
+                    type="checkbox"
+                    checked={config.ai_analysis.insights}
+                    onChange={(e) => handleConfigChange('ai_analysis', 'insights', e.target.checked)}
+                    disabled={loading}
+                  />
+                  Generate Insights
+                </label>
+                <label className={styles.checkboxLabel}>
+                  <input
+                    type="checkbox"
+                    checked={config.ai_analysis.recommendations}
+                    onChange={(e) => handleConfigChange('ai_analysis', 'recommendations', e.target.checked)}
+                    disabled={loading}
+                  />
+                  Generate Recommendations
+                </label>
+              </div>
             </div>
           </div>
 

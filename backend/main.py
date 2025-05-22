@@ -28,12 +28,36 @@ load_dotenv(".env.local")
 # Get API key from environment variable
 openai_api_key = os.getenv("OPENAI_API_KEY")
 if not openai_api_key:
-    raise ValueError("OPENAI_API_KEY is not set in .env.local file")
+    print("WARNING: OPENAI_API_KEY is not set in .env.local file. AI features will not work.")
+    openai_api_key = "invalid-key"  # Set a dummy key so the app doesn't crash
 
 # Initialize OpenAI client
 openai = OpenAI(api_key=openai_api_key)
 
+# Check if API key is valid by making a simple request
+try:
+    # Test API key with a minimal request
+    openai.models.list(limit=1)
+    print("✓ OpenAI API key validation successful")
+    has_valid_openai_key = True
+except Exception as e:
+    print(f"✗ OpenAI API key validation failed: {str(e)}")
+    has_valid_openai_key = False
+
 app = FastAPI()
+
+# Add a route to check API key status
+@app.get("/api/openai-status")
+async def check_openai_status():
+    """Check if the OpenAI API key is valid"""
+    if has_valid_openai_key:
+        return {"status": "active", "message": "OpenAI API key is valid and active"}
+    else:
+        return {
+            "status": "inactive", 
+            "message": "OpenAI API key is invalid or missing. AI features will not work properly.",
+            "solution": "Check your .env.local file and ensure OPENAI_API_KEY is set correctly."
+        }
 
 # Configure CORS to allow requests from your frontend
 app.add_middleware(
@@ -1490,6 +1514,107 @@ async def process_request_data(data: dict, endpoint_func) -> dict:
                     "more_body": False
                 }
 
+        # Check if we're trying to call the ask_ai function
+        if endpoint_func == ask_ai:
+            try:
+                # Direct call to OpenAI API instead of using the mock request
+                query = data.get("query")
+                spreadsheet_data = data.get("data")
+
+                if not query or not spreadsheet_data:
+                    return {"error": "Missing query or spreadsheet data"}
+
+                headers = spreadsheet_data[0] if spreadsheet_data and len(spreadsheet_data) > 0 else []
+
+                column_stats = {}
+                for col_idx, header in enumerate(headers):
+                    try:
+                        values = [row[col_idx] for row in spreadsheet_data[1:] if col_idx < len(row) and row[col_idx] != '']
+                        if not values:
+                            continue
+                        numeric_values = []
+                        for val in values:
+                            try:
+                                num_val = float(str(val).replace(',', ''))
+                                numeric_values.append(num_val)
+                            except (ValueError, TypeError):
+                                pass
+
+                        stats = {
+                            "count": len(values),
+                            "unique": len(set(values)),
+                            "missing": len(spreadsheet_data[1:]) - len(values)
+                        }
+
+                        if numeric_values:
+                            stats.update({
+                                "min": min(numeric_values),
+                                "max": max(numeric_values),
+                                "mean": sum(numeric_values) / len(numeric_values),
+                                "median": sorted(numeric_values)[len(numeric_values)//2],
+                                "std": np.std(numeric_values) if len(numeric_values) > 1 else 0
+                            })
+
+                        column_stats[header] = stats
+
+                    except Exception as e:
+                        print(f"Error processing column {header}: {str(e)}")
+                        continue
+
+                correlations = {}
+                numeric_columns = {h: [] for h, s in column_stats.items() if "mean" in s}
+
+                if len(numeric_columns) >= 2:
+                    for col_idx, header in enumerate(headers):
+                        if header in numeric_columns:
+                            try:
+                                values = [float(row[col_idx]) for row in spreadsheet_data[1:] 
+                                         if col_idx < len(row) and row[col_idx] != '']
+                                numeric_columns[header] = values
+                            except:
+                                continue
+
+                    for col1 in numeric_columns:
+                        correlations[col1] = {}
+                        for col2 in numeric_columns:
+                            if col1 != col2:
+                                try:
+                                    corr, _ = pearsonr(numeric_columns[col1], numeric_columns[col2])
+                                    correlations[col1][col2] = corr
+                                except:
+                                    correlations[col1][col2] = None
+
+                prompt = f"""
+Here is a comprehensive analysis of a dataset with {len(spreadsheet_data)} rows and {len(headers)} columns.
+
+Column Statistics:
+{json.dumps(column_stats, indent=2)}
+
+Correlations between numeric columns:
+{json.dumps(correlations, indent=2)}
+
+User's question: {query}
+
+Please analyze the data using these comprehensive statistics to provide a detailed answer.
+If the question requires specific data points, explain that you're using statistical summaries of the entire dataset.
+If the answer involves identifying trends or patterns, use the correlation analysis and statistical summaries.
+If you need more specific data to answer accurately, explain what additional information would be helpful.
+"""
+                try:
+                    response = openai.chat.completions.create(
+                        model="gpt-4",
+                        messages=[{"role": "user", "content": prompt}]
+                    )
+                    return {"answer": response.choices[0].message.content}
+                except Exception as openai_error:
+                    print(f"OpenAI API Error: {str(openai_error)}")
+                    return {"error": f"OpenAI API Error: {str(openai_error)}", "answer": "Could not generate AI insights due to an API error. Please try again later."}
+            
+            except Exception as e:
+                print(f"Error in direct OpenAI processing: {str(e)}")
+                return {"error": str(e), "answer": "Error processing AI request. Please try again with a different dataset."}
+        
+        # For all other endpoints, use the standard mock request approach
         request = Request(
             scope={
                 "type": "http",
@@ -1547,6 +1672,7 @@ async def perform_ai_analysis(sheet: SheetSelection, config: Dict) -> ReportSect
     """Perform AI analysis on sheet data"""
     try:
         insights = []
+        error_messages = []
         
         # Generate different types of insights based on config
         if config.get("trends"):
@@ -1555,8 +1681,13 @@ async def perform_ai_analysis(sheet: SheetSelection, config: Dict) -> ReportSect
                 "data": sheet.data
             }
             trend_response = await process_request_data(trend_data, ask_ai)
-            if isinstance(trend_response, dict) and "answer" in trend_response:
-                insights.append(trend_response["answer"])
+            if isinstance(trend_response, dict):
+                if "answer" in trend_response:
+                    insights.append(trend_response["answer"])
+                elif "error" in trend_response:
+                    error_message = f"Error analyzing trends: {trend_response['error']}"
+                    error_messages.append(error_message)
+                    print(error_message)
         
         if config.get("insights"):
             insight_data = {
@@ -1564,8 +1695,13 @@ async def perform_ai_analysis(sheet: SheetSelection, config: Dict) -> ReportSect
                 "data": sheet.data
             }
             insight_response = await process_request_data(insight_data, ask_ai)
-            if isinstance(insight_response, dict) and "answer" in insight_response:
-                insights.append(insight_response["answer"])
+            if isinstance(insight_response, dict):
+                if "answer" in insight_response:
+                    insights.append(insight_response["answer"])
+                elif "error" in insight_response:
+                    error_message = f"Error generating insights: {insight_response['error']}"
+                    error_messages.append(error_message)
+                    print(error_message)
         
         if config.get("recommendations"):
             recommendations_data = {
@@ -1573,8 +1709,21 @@ async def perform_ai_analysis(sheet: SheetSelection, config: Dict) -> ReportSect
                 "data": sheet.data
             }
             recommendations_response = await process_request_data(recommendations_data, ask_ai)
-            if isinstance(recommendations_response, dict) and "answer" in recommendations_response:
-                insights.append(recommendations_response["answer"])
+            if isinstance(recommendations_response, dict):
+                if "answer" in recommendations_response:
+                    insights.append(recommendations_response["answer"])
+                elif "error" in recommendations_response:
+                    error_message = f"Error generating recommendations: {recommendations_response['error']}"
+                    error_messages.append(error_message)
+                    print(error_message)
+        
+        if not insights and error_messages:
+            # Return section with error information if all API calls failed
+            return ReportSection(
+                title="AI Insights",
+                content={"error": "; ".join(error_messages), "insights_count": 0},
+                insights=["AI analysis could not be completed. Please check your OpenAI API key and try again."]
+            )
         
         return ReportSection(
             title="AI Insights",
@@ -1586,7 +1735,7 @@ async def perform_ai_analysis(sheet: SheetSelection, config: Dict) -> ReportSect
         return ReportSection(
             title="AI Insights",
             content={"error": str(e)},
-            insights=["AI analysis failed"]
+            insights=["AI analysis failed. Please check the API key configuration."]
         )
 
 # Add this new function to generate summary metrics

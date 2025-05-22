@@ -929,7 +929,7 @@ export default function Home() {
   const loadSpreadsheetData = async (id) => {
     if (!user) return;
     
-    console.log("Loading spreadsheet data for ID:", id);
+   
     
     try {
       const docRef = doc(db, 'spreadsheets', id);
@@ -937,34 +937,22 @@ export default function Home() {
       
       if (docSnap.exists()) {
         const sheetData = docSnap.data();
-        console.log("Retrieved spreadsheet data:", sheetData);
+       
         
         setSpreadsheetId(id);
         
         if (sheetData.ownerId === user.uid) {
-          // Set title - with improved backup handling
-          if (sheetData.title && sheetData.title.trim() !== '') {
-            console.log("Setting document title from Firestore:", sheetData.title);
+          // Set title
+          if (sheetData.title) {
+            
             setDocumentTitle(sheetData.title);
-            // Save to localStorage as backup
-            localStorage.setItem(`spreadsheet_${id}_title`, sheetData.title);
           } else {
-            // Try to get title from localStorage if missing from Firestore
-            const localTitle = localStorage.getItem(`spreadsheet_${id}_title`);
-            if (localTitle && localTitle.trim() !== '') {
-              console.log("Setting document title from localStorage:", localTitle);
-              setDocumentTitle(localTitle);
-              // Save back to Firestore to fix the missing title
-              updateDoc(docRef, { title: localTitle });
-            } else {
-              console.log("No title found, using default");
-              setDocumentTitle('Untitled spreadsheet');
-            }
+            setDocumentTitle('Untitled spreadsheet');
           }
           
           // Load sheets data
           if (sheetData.sheets && Array.isArray(sheetData.sheets) && sheetData.sheets.length > 0) {
-            console.log("Loading sheets data");
+           
             
             // Convert sheet data back to 2D arrays
             const processedSheets = sheetData.sheets.map(sheet => {
@@ -1010,7 +998,7 @@ export default function Home() {
               };
             });
             
-            console.log("Processed sheets:", processedSheets.length);
+            
             
             // Set the active sheet ID to the first sheet if we don't have one already
             if (!activeSheetId && processedSheets.length > 0) {
@@ -1026,17 +1014,17 @@ export default function Home() {
             // Load the data from the active sheet into the grid
             const activeSheet = processedSheets.find(s => s.id === activeSheetId) || processedSheets[0];
             if (activeSheet) {
-              console.log("Setting active sheet data");
+              
               setData(activeSheet.data || []);
-            }
-          } else {
+          }
+        } else {
             // No sheets found, create a default one
-            console.log("No sheets found, creating default");
             const defaultSheet = {
               id: 'default',
               name: 'Main Sheet',
               data: [['', '', '', ''], ['', '', '', '']]
             };
+            
             
             setSheets([defaultSheet]);
             allSheetsRef.current = [defaultSheet];
@@ -1315,8 +1303,11 @@ export default function Home() {
   // Update the addChartToDashboard function to include more detailed source information
   const addChartToDashboard = async (dashboardId) => {
     if (!user || !chartConfig) {
+      
       return;
     }
+    
+   
     
     try {
       // First, make a clean copy without functions
@@ -1338,43 +1329,23 @@ export default function Home() {
       const sourceColumns = chartConfig.sourceInfo?.columns || [];
       const sheetId = activeSheetId || 'default';
       
-      // Create a data hash for change detection - but limit the amount of data we process
+      // Create a data hash for change detection
       let extractedData = [];
       
       if (sourceRange) {
         const { startRow, startCol, endRow, endCol } = sourceRange;
-        // Extract the data range but limit to reasonable size
-        const maxRows = Math.min(endRow - startRow + 1, 100); // Limit to 100 rows max
-        const maxCols = Math.min(endCol - startCol + 1, 20);  // Limit to 20 columns max
-        
-        for (let row = startRow; row < startRow + maxRows; row++) {
+        // Extract the data range
+        for (let row = startRow; row <= endRow; row++) {
           if (!currentData[row]) continue;
           const rowData = [];
-          for (let col = startCol; col < startCol + maxCols; col++) {
-            if (col <= endCol && col < currentData[row].length) {
-              rowData.push(currentData[row][col] || '');
-            }
-          }
-          extractedData.push(rowData);
-        }
-        
-        // If we limited the data, add a note
-        if (endRow - startRow + 1 > maxRows || endCol - startCol + 1 > maxCols) {
-          console.log("Data was truncated for Firestore limitations");
-        }
-      } else {
-        // Use limited data
-        const maxRows = Math.min(currentData.length, 100);
-        const maxCols = Math.min(currentData[0] ? currentData[0].length : 0, 20);
-        
-        for (let row = 0; row < maxRows; row++) {
-          if (!currentData[row]) continue;
-          const rowData = [];
-          for (let col = 0; col < maxCols; col++) {
+          for (let col = startCol; col <= endCol; col++) {
             rowData.push(currentData[row][col] || '');
           }
           extractedData.push(rowData);
         }
+      } else {
+        // Use all data
+        extractedData = currentData;
       }
       
       // Create a hash for change detection
@@ -1388,29 +1359,7 @@ export default function Home() {
         delete sanitizedConfig.sourceInfo;
       }
       
-      // IMPORTANT: Simplify the datasets in chartConfig to reduce size
-      if (sanitizedConfig.data && sanitizedConfig.data.datasets) {
-        // Limit the amount of data points in each dataset
-        sanitizedConfig.data.datasets = sanitizedConfig.data.datasets.map(dataset => {
-          if (Array.isArray(dataset.data) && dataset.data.length > 100) {
-            dataset.data = dataset.data.slice(0, 100); // Limit to 100 data points
-          }
-          return dataset;
-        });
-        
-        // Limit the number of datasets
-        if (sanitizedConfig.data.datasets.length > 10) {
-          sanitizedConfig.data.datasets = sanitizedConfig.data.datasets.slice(0, 10);
-        }
-      }
-      
-      // Also limit labels
-      if (sanitizedConfig.data && Array.isArray(sanitizedConfig.data.labels) && 
-          sanitizedConfig.data.labels.length > 100) {
-        sanitizedConfig.data.labels = sanitizedConfig.data.labels.slice(0, 100);
-      }
-      
-      // Create chart item with detailed source info - but minimize the data stored
+      // Create chart item with detailed source info
       const chartItem = {
         id: `chart_${Date.now()}`,
         type: 'chart',
@@ -1433,9 +1382,11 @@ export default function Home() {
           range: sourceRange,
           columns: sourceColumns,
           lastUpdated: new Date().toISOString(),
-          dataHash: dataHash.substring(0, 500) // Limit the hash length
+          dataHash: dataHash
         }
       };
+      
+      
       
       // Get the dashboard document
       const dashboardRef = doc(db, 'dashboards', dashboardId);
@@ -1449,54 +1400,47 @@ export default function Home() {
         // Add the new chart item
         const updatedItems = [...items, chartItem];
         
-        // Instead of using the complex deepSanitizeForFirestore, use a simpler approach
-        // to drastically reduce the number of fields
-        const simplifiedItems = updatedItems.map(item => {
-          // For charts, simplify by removing unnecessary nested objects
-          if (item.type === 'chart') {
-            return {
-              id: item.id,
-              type: item.type,
-              title: item.title,
-              position: item.position,
-              createdAt: item.createdAt,
-              sourceSpreadsheetId: item.sourceSpreadsheetId,
-              chartConfig: {
-                type: item.chartConfig?.type || 'bar',
-                data: {
-                  labels: item.chartConfig?.data?.labels || [],
-                  datasets: (item.chartConfig?.data?.datasets || []).map(ds => ({
-                    label: ds.label,
-                    data: ds.data,
-                    backgroundColor: ds.backgroundColor,
-                    borderColor: ds.borderColor
-                  }))
-                },
-                options: {
-                  responsive: true,
-                  maintainAspectRatio: false
-                }
-              },
-              sourceInfo: {
-                spreadsheetId: item.sourceInfo?.spreadsheetId,
-                sheetId: item.sourceInfo?.sheetId,
-                range: item.sourceInfo?.range,
-                lastUpdated: item.sourceInfo?.lastUpdated
-              }
-            };
+        // Deep sanitize items to ensure no nested arrays
+        const deepSanitizeForFirestore = (data) => {
+          if (data === null || data === undefined) return data;
+          
+          // Convert arrays to objects with numeric keys
+          if (Array.isArray(data)) {
+            const result = {};
+            data.forEach((item, index) => {
+              result[`_${index}`] = deepSanitizeForFirestore(item);
+            });
+            return result;
           }
-          return item;
-        });
+          
+          // Handle objects
+          if (typeof data === 'object' && !(data instanceof Date)) {
+            const result = {};
+            Object.keys(data).forEach(key => {
+              if (data[key] !== undefined) {
+                result[key] = deepSanitizeForFirestore(data[key]);
+              }
+            });
+            return result;
+          }
+          
+          // Return primitives and Dates as is
+          return data;
+        };
         
-        // Update dashboard with simplified items
+        // Create a completely sanitized version of the items
+        const completelySanitizedItems = deepSanitizeForFirestore(updatedItems);
+        
+        // Update dashboard
         await updateDoc(dashboardRef, {
-          items: simplifiedItems,
+          items: completelySanitizedItems,
           lastModified: serverTimestamp(),
           lastSyncedWith: {
-            spreadsheetId: spreadsheetId,
+            spreadsheetId: docId,
             syncedAt: serverTimestamp()
           }
         });
+        
         
         toast.success('Chart added to dashboard successfully!');
         setShowAddToDashboardModal(false);
@@ -1505,7 +1449,100 @@ export default function Home() {
       }
     } catch (error) {
       console.error('Error adding chart to dashboard:', error);
-      toast.error('Failed to add chart to dashboard: ' + error.message);
+      toast.error('Failed to add chart to dashboard');
+    }
+  };
+
+  // Add this function to create a new dashboard and add the chart
+  const createAndAddToDashboard = async () => {
+    if (!user || !chartConfig || !newDashboardTitle.trim()) {
+      
+      return;
+    }
+    
+    setIsCreatingDashboard(true);
+    
+    
+    try {
+      // First strip out any functions from the config
+      let cleanConfig;
+      try {
+        cleanConfig = removeFunctionsFromConfig(chartConfig);
+      } catch (error) {
+        console.error("Error removing functions:", error);
+        cleanConfig = JSON.parse(JSON.stringify(chartConfig, (key, value) => 
+          typeof value === 'function' ? undefined : value
+        ));
+      }
+      
+      // Then sanitize
+      const sanitizedConfig = sanitizeForFirestore(cleanConfig);
+      
+      // Ensure source info is included
+      const sourceInfo = {
+        spreadsheetId: spreadsheetId,
+        range: sanitizedConfig.sourceInfo?.range || chartConfig.sourceInfo?.range,
+        columns: sanitizedConfig.sourceInfo?.columns || chartConfig.sourceInfo?.columns || []
+      };
+      
+      // Create a chart item with source information
+      const chartItem = {
+        id: `chart_${Date.now()}`,
+        type: 'chart',
+        chartConfig: sanitizedConfig,
+        position: {
+          x: 0,
+          y: 0,
+          w: 6,
+          h: 4
+        },
+        title: chartConfig.type ? 
+          `${chartConfig.type.charAt(0).toUpperCase() + chartConfig.type.slice(1)} Chart` : 
+          'Chart',
+        createdAt: new Date().toISOString(),
+        sourceSpreadsheetId: spreadsheetId,
+        sourceInfo: {
+          spreadsheetId: spreadsheetId,
+          range: sourceInfo.range || null,
+          columns: sourceInfo.columns || [],
+          lastUpdated: new Date().toISOString()
+        }
+      };
+      
+      
+      
+      // Create a new dashboard document with auto-generated ID
+      const dashboardRef = doc(collection(db, 'dashboards'));
+      const dashboardId = dashboardRef.id;
+      
+      // Create the dashboard data
+      const dashboardData = {
+        title: newDashboardTitle.trim(),
+        ownerId: user.uid,
+        items: [chartItem], // Include the chart item
+        createdAt: serverTimestamp(),
+        lastModified: serverTimestamp()
+      };
+      
+      // Save the dashboard to Firestore
+      await setDoc(dashboardRef, dashboardData);
+      
+    
+      
+      // Close the modal and reset form
+      setShowAddToDashboardModal(false);
+      setNewDashboardTitle('');
+      
+      // Show success message
+      toast.success("Dashboard created and chart added!");
+      
+      // Refresh the dashboards list
+      fetchUserDashboards();
+    } catch (error) {
+      console.error("Error creating dashboard:", error);
+      alert(`Failed to create dashboard: ${error.message}`);
+    } finally {
+      setIsCreatingDashboard(false);
     }
   };
 
@@ -1675,32 +1712,14 @@ export default function Home() {
                 extractedData
               );
               
-              // IMPORTANT: Simplify the chart config to avoid index limits
-              const simplifiedConfig = {
-                type: updatedChartConfig.type || 'bar',
-                data: {
-                  labels: updatedChartConfig.data?.labels || [],
-                  datasets: (updatedChartConfig.data?.datasets || []).map(ds => ({
-                    label: ds.label,
-                    data: ds.data,
-                    backgroundColor: ds.backgroundColor,
-                    borderColor: ds.borderColor
-                  }))
-                },
-                options: {
-                  responsive: true,
-                  maintainAspectRatio: false
-                }
-              };
-              
               updatedItems[index] = {
                 ...item,
-                chartConfig: simplifiedConfig,
+                chartConfig: updatedChartConfig,
                 sourceInfo: {
-                  spreadsheetId: item.sourceInfo?.spreadsheetId,
-                  sheetId: item.sourceInfo?.sheetId,
+                  ...item.sourceInfo,
                   lastUpdated: new Date().toISOString(),
-                  dataHash: dataHash.substring(0, 500) // Limit the hash length
+                  dataHash: dataHash,
+                  formattedData: formattedData // Add the formatted data
                 }
               };
               
@@ -1717,46 +1736,40 @@ export default function Home() {
           try {
             
             
-            // Instead of using deepSanitizeForFirestore, create a simplified version of items
-            // This approach drastically reduces the number of fields in the document
-            const simplifiedItems = updatedItems.map(item => {
-              // For charts, create a minimal representation
-              if (item.type === 'chart') {
-                return {
-                  id: item.id,
-                  type: 'chart',
-                  title: item.title || 'Chart',
-                  position: item.position || { x: 0, y: 0, w: 6, h: 4 },
-                  chartConfig: {
-                    type: item.chartConfig?.type || 'bar',
-                    data: {
-                      labels: Array.isArray(item.chartConfig?.data?.labels) ? 
-                        item.chartConfig.data.labels.slice(0, 100) : [],
-                      datasets: Array.isArray(item.chartConfig?.data?.datasets) ?
-                        item.chartConfig.data.datasets.slice(0, 5).map(ds => ({
-                          label: ds.label || '',
-                          data: Array.isArray(ds.data) ? ds.data.slice(0, 50) : [],
-                          backgroundColor: ds.backgroundColor || 'rgba(0,0,0,0.1)',
-                          borderColor: ds.borderColor || 'rgba(0,0,0,0.1)'
-                        })) : []
-                    },
-                    options: { responsive: true }
-                  },
-                  sourceInfo: {
-                    spreadsheetId: item.sourceInfo?.spreadsheetId,
-                    sheetId: item.sourceInfo?.sheetId,
-                    lastUpdated: new Date().toISOString()
-                  }
-                };
+            // Deep sanitize items to ensure no nested arrays
+            const deepSanitizeForFirestore = (data) => {
+              if (data === null || data === undefined) return data;
+              
+              // Convert arrays to objects with numeric keys
+              if (Array.isArray(data)) {
+                const result = {};
+                data.forEach((item, index) => {
+                  result[`_${index}`] = deepSanitizeForFirestore(item);
+                });
+                return result;
               }
-              return item;
-            });
+              
+              // Handle objects
+              if (typeof data === 'object' && !(data instanceof Date)) {
+                const result = {};
+                Object.keys(data).forEach(key => {
+                  if (data[key] !== undefined) {
+                    result[key] = deepSanitizeForFirestore(data[key]);
+                  }
+                });
+                return result;
+              }
+              
+              // Return primitives and Dates as is
+              return data;
+            };
             
-            // No need for deepSanitizeForFirestore anymore
+            // Create a completely sanitized version of the items
+            const completelySanitizedItems = deepSanitizeForFirestore(updatedItems);
             
             // Use this for the Firestore update
             await updateDoc(doc(db, 'dashboards', dashboardId), {
-              items: simplifiedItems,
+              items: completelySanitizedItems,
               lastModified: serverTimestamp(),
               lastSyncedWith: {
                 spreadsheetId: docId,
@@ -1829,100 +1842,59 @@ export default function Home() {
     // Clone the config to avoid modifying the original
     const updatedConfig = JSON.parse(JSON.stringify(chartConfig));
     
-    // IMPORTANT: Limit data size to prevent Firestore limitations
-    const maxRows = Math.min(newData.length, 50);
-    const maxCols = Math.min(newData[0]?.length || 0, 20);
-    
-    // Create a limited version of the data
-    const limitedData = [];
-    for (let i = 0; i < maxRows; i++) {
-      if (!newData[i]) continue;
-      const row = [];
-      for (let j = 0; j < maxCols; j++) {
-        row.push(newData[i][j] || '');
-      }
-      limitedData.push(row);
-    }
-    
     // Handle different chart types
     if (['bar', 'line', 'radar'].includes(chartConfig.type)) {
       // For these chart types, first row should be labels, remaining rows are data series
-      if (limitedData.length >= 2) {
+      if (newData.length >= 2) {
         // Update labels
         if (updatedConfig.data) {
-          updatedConfig.data.labels = limitedData[0].slice(1); // Skip first cell which is often empty
+          updatedConfig.data.labels = newData[0].slice(1); // Skip first cell which is often empty
           
-          // Update datasets - limit to max 10 datasets
-          const maxDatasets = Math.min(limitedData.length - 1, 10);
-          updatedConfig.data.datasets = [];
-          
-          for (let i = 0; i < maxDatasets; i++) {
-            const row = limitedData[i + 1];
-            const hue = (i * 137.5) % 360;
-            const color = `hsla(${hue}, 70%, 60%, 0.7)`;
-            
-            updatedConfig.data.datasets.push({
-              label: row[0] || `Series ${i + 1}`,
-              data: row.slice(1).map(val => typeof val === 'string' ? parseFloat(val) || 0 : val),
-              backgroundColor: color,
-              borderColor: color.replace('0.7)', '1)'),
-              borderWidth: 1
-            });
-          }
+          // Update datasets
+          updatedConfig.data.datasets = newData.slice(1).map((row, index) => {
+            // Preserve original dataset properties if they exist
+            const originalDataset = (updatedConfig.data.datasets && updatedConfig.data.datasets[index]) || {};
+            return {
+              ...originalDataset,
+              label: row[0] || `Series ${index + 1}`,
+              data: row.slice(1).map(val => typeof val === 'string' ? parseFloat(val) || 0 : val)
+            };
+          });
         }
       }
     } else if (['pie', 'doughnut', 'polarArea'].includes(chartConfig.type)) {
-      // For pie charts, limit to max 30 data points
-      if (limitedData.length >= 2) {
+      // For pie/doughnut/polar charts, use first column as labels, second as data
+      if (newData.length >= 2) {
         if (updatedConfig.data) {
-          // Max 30 data points for pie charts
-          const maxPiePoints = Math.min(limitedData.length - 1, 30);
-          
           // Update labels - use first column of data rows (skip header)
-          updatedConfig.data.labels = [];
-          const dataValues = [];
+          updatedConfig.data.labels = newData.slice(1).map(row => String(row[0] || ''));
           
-          for (let i = 1; i <= maxPiePoints; i++) {
-            if (limitedData[i]) {
-              updatedConfig.data.labels.push(String(limitedData[i][0] || ''));
-              dataValues.push(typeof limitedData[i][1] === 'number' ? 
-                limitedData[i][1] : parseFloat(limitedData[i][1]) || 0);
-            }
-          }
-          
-          // Generate colors
-          const colors = updatedConfig.data.labels.map((_, i) => {
-            const hue = (i * 137.5) % 360;
-            return `hsla(${hue}, 70%, 60%, 0.7)`;
-          });
+          // Use second column for data values
+          const dataValues = newData.slice(1).map(row => 
+            typeof row[1] === 'number' ? row[1] : parseFloat(row[1]) || 0
+          );
           
           // Update or create datasets
-          updatedConfig.data.datasets = [{
-            data: dataValues,
-            backgroundColor: colors,
-            borderColor: colors.map(c => c.replace('0.7)', '1)')),
-            borderWidth: 1
-          }];
+          if (!updatedConfig.data.datasets || !updatedConfig.data.datasets.length) {
+            updatedConfig.data.datasets = [{
+              data: dataValues,
+              backgroundColor: updatedConfig.data.labels.map((_, i) => {
+                const hue = (i * 137.5) % 360;
+                return `hsla(${hue}, 70%, 60%, 0.7)`;
+              })
+            }];
+          } else {
+            updatedConfig.data.datasets[0].data = dataValues;
+          }
         }
       }
     }
     
-    // Also simplify options to reduce document size
-    if (updatedConfig.options) {
-      updatedConfig.options = {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: {
-          legend: { position: 'top' },
-          title: { display: Boolean(chartConfig.options?.plugins?.title?.text) }
-        }
-      };
-      
-      // Add scales only for bar/line charts
-      if (['bar', 'line'].includes(chartConfig.type)) {
-        updatedConfig.options.scales = { y: { beginAtZero: true }};
-      }
-    }
+    // Add a metadata field to track the format
+    updatedConfig._dataFormat = {
+      headers: newData[0] || [],
+      rows: newData.slice(1) || []
+    };
     
     return updatedConfig;
   };
@@ -2147,23 +2119,24 @@ export default function Home() {
       return;
     }
     
+   
+    
     // Create a debounced save function to avoid too many saves while typing
     const saveTimeout = setTimeout(() => {
-      console.log("Saving title to Firestore:", documentTitle);
+      
       
       updateDoc(doc(db, 'spreadsheets', spreadsheetId), {
         title: documentTitle,
         lastModified: serverTimestamp()
       })
       .then(() => {
+        
         setLastSaved(new Date());
-        // Store locally as a backup
-        localStorage.setItem(`spreadsheet_${spreadsheetId}_title`, documentTitle);
       })
       .catch(error => {
         console.error('Error saving title:', error);
       });
-    }, 1000); // 1 second delay
+    }, 1500); // 1.5 second delay
     
     // Clear timeout if component unmounts or title changes again
     return () => clearTimeout(saveTimeout);
@@ -2471,149 +2444,6 @@ export default function Home() {
   // Add this state declaration along with your other state variables:
   const [showDataCleaningPanel, setShowDataCleaningPanel] = useState(false);
 
-  // Add this function to create a new dashboard and add the chart
-  const createAndAddToDashboard = async () => {
-    if (!user || !chartConfig || !newDashboardTitle.trim()) {
-      return;
-    }
-    
-    setIsCreatingDashboard(true);
-    
-    try {
-      // First strip out any functions from the config
-      let cleanConfig;
-      try {
-        cleanConfig = removeFunctionsFromConfig(chartConfig);
-      } catch (error) {
-        console.error("Error removing functions:", error);
-        cleanConfig = JSON.parse(JSON.stringify(chartConfig, (key, value) => 
-          typeof value === 'function' ? undefined : value
-        ));
-      }
-      
-      // Then sanitize and ensure no undefined values
-      const sanitizedConfig = sanitizeForFirestore(cleanConfig || {});
-      
-      // IMPORTANT: Ensure no undefined values which Firestore rejects
-      const safeConfig = JSON.parse(JSON.stringify(sanitizedConfig || {}));
-      
-      // IMPORTANT: Simplify the datasets in chartConfig to reduce size
-      if (safeConfig.data && safeConfig.data.datasets) {
-        // Limit the amount of data points in each dataset
-        safeConfig.data.datasets = safeConfig.data.datasets.map(dataset => {
-          const safeDataset = { ...dataset };
-          
-          // Ensure data array exists and has no undefined values
-          if (Array.isArray(safeDataset.data)) {
-            safeDataset.data = safeDataset.data.map(val => 
-              val === undefined || val === null ? 0 : val
-            ).slice(0, 100); // Limit to 100 data points
-          } else {
-            safeDataset.data = [];
-          }
-          
-          // Ensure all properties exist
-          safeDataset.label = safeDataset.label || '';
-          safeDataset.backgroundColor = safeDataset.backgroundColor || 'rgba(0,0,0,0.1)';
-          safeDataset.borderColor = safeDataset.borderColor || 'rgba(0,0,0,0.1)';
-          
-          return safeDataset;
-        }).slice(0, 10); // Limit to 10 datasets
-      } else {
-        // Ensure data structure exists
-        safeConfig.data = { datasets: [], labels: [] };
-      }
-      
-      // Also limit labels
-      if (safeConfig.data && Array.isArray(safeConfig.data.labels)) {
-        safeConfig.data.labels = safeConfig.data.labels
-          .map(label => label === undefined || label === null ? '' : String(label))
-          .slice(0, 100);
-      } else {
-        safeConfig.data.labels = [];
-      }
-      
-      // Extract source data in a limited way
-      const sourceRange = chartConfig?.sourceInfo?.range || null;
-      const sourceColumns = chartConfig?.sourceInfo?.columns || [];
-      const sheetId = activeSheetId || 'default';
-      
-      // Create a simplified chart item - carefully avoiding undefined values
-      const chartItem = {
-        id: `chart_${Date.now()}`,
-        type: 'chart',
-        chartConfig: {
-          type: safeConfig.type || 'bar',
-          data: {
-            labels: safeConfig.data?.labels || [],
-            datasets: (safeConfig.data?.datasets || []).map(ds => ({
-              label: ds.label || '',
-              data: Array.isArray(ds.data) ? ds.data : [],
-              backgroundColor: ds.backgroundColor || 'rgba(0,0,0,0.1)',
-              borderColor: ds.borderColor || 'rgba(0,0,0,0.1)'
-            }))
-          },
-          options: {
-            responsive: true,
-            maintainAspectRatio: false
-          }
-        },
-        position: {
-          x: 0,
-          y: 0,
-          w: 6,
-          h: 4
-        },
-        title: chartConfig.type ? 
-          `${chartConfig.type.charAt(0).toUpperCase() + chartConfig.type.slice(1)} Chart` : 
-          'Chart',
-        createdAt: new Date().toISOString(),
-        sourceSpreadsheetId: spreadsheetId || '',
-        sourceInfo: {
-          spreadsheetId: spreadsheetId || '',
-          sheetId: sheetId || 'default',
-          range: sourceRange || null,
-          columns: sourceColumns.map(col => col || ''),
-          lastUpdated: new Date().toISOString()
-        }
-      };
-      
-      // Check for any undefined values
-      const safeChartItem = JSON.parse(JSON.stringify(chartItem));
-      
-      // Create a new dashboard document with auto-generated ID
-      const dashboardRef = doc(collection(db, 'dashboards'));
-      const dashboardId = dashboardRef.id;
-      
-      // Create the dashboard data with minimal fields
-      const dashboardData = {
-        title: newDashboardTitle.trim(),
-        ownerId: user.uid,
-        items: [safeChartItem], // Include the simplified chart item
-        createdAt: serverTimestamp(),
-        lastModified: serverTimestamp()
-      };
-      
-      // Save the dashboard to Firestore
-      await setDoc(dashboardRef, dashboardData);
-      
-      // Close the modal and reset form
-      setShowAddToDashboardModal(false);
-      setNewDashboardTitle('');
-      
-      // Show success message
-      toast.success("Dashboard created and chart added!");
-      
-      // Refresh the dashboards list
-      fetchUserDashboards();
-    } catch (error) {
-      console.error("Error creating dashboard:", error);
-      toast.error(`Failed to create dashboard: ${error.message}`);
-    } finally {
-      setIsCreatingDashboard(false);
-    }
-  };
-
   return (
     <div className={styles.container}>
       {/* Header */}
@@ -2646,7 +2476,7 @@ export default function Home() {
                     return;
                   }
                   
-          updateDoc(doc(db, 'spreadsheets', spreadsheetId), {
+                  updateDoc(doc(db, 'spreadsheets', spreadsheetId), {
                     title: documentTitle,
                     lastModified: serverTimestamp()
                   })
@@ -2890,7 +2720,7 @@ export default function Home() {
                 
                 setChartConfig(testConfig);
                 setShowChartModal(true);
-    } else {
+              } else {
                 // For other chart types, we can handle multiple datasets
                 // First column can be labels
                 const rowLabels = filteredData.slice(1).map(row => row[0] || '');
@@ -3765,8 +3595,8 @@ export default function Home() {
                           dashboard.lastModified.toDate() : 
                           new Date(dashboard.lastModified)) : 
                         new Date();
-
-  return (
+                      
+                      return (
                         <div 
                           key={dashboard.id}
                           className={styles.dashboardCard}

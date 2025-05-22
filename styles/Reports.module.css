@@ -566,3 +566,27 @@
 .contextMenuItem.delete:hover {
   background-color: #fee2e2;
 }
+
+.apiWarning {
+  background-color: #FEF2F2;
+  border: 1px solid #FCA5A5;
+  border-radius: 0.375rem;
+  padding: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.apiWarning h4 {
+  color: #B91C1C;
+  margin-top: 0;
+  margin-bottom: 0.5rem;
+}
+
+.apiWarning p {
+  margin: 0.25rem 0;
+  color: #1F2937;
+}
+
+.apiSolution {
+  margin-top: 0.5rem;
+  font-size: 0.875rem;
+}

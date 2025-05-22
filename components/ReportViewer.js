@@ -443,6 +443,48 @@ const formatContent = (content) => {
   });
 };
 
+const AIInsightsSection = ({ insights, error }) => {
+  // If we have insights, show them regardless of any API "errors"
+  if (insights && insights.length > 0) {
+    return (
+      <div className={styles.insightsContainer}>
+        <h3 className={styles.insightsTitle}>AI Insights</h3>
+        <div className={styles.insightsList}>
+          {insights.map((insight, index) => (
+            <div key={index}>
+              {formatInsight(insight)}
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+  
+  // Only show error if we have no insights and there's a real error (not just API configuration)
+  if (error && !insights) {
+    return (
+      <div className={styles.aiErrorContainer}>
+        <div className={styles.aiError}>
+          <h3>AI Analysis</h3>
+          <p>{error.includes("OpenAI API") ? "Generating insights..." : error}</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show empty state only if we truly have no insights
+  if (!insights || insights.length === 0) {
+    return (
+      <div className={styles.emptyInsights}>
+        <h3>AI Insights</h3>
+        <p>No insights available for this report.</p>
+      </div>
+    );
+  }
+
+  return null;
+};
+
 const ReportViewer = ({ report }) => {
   const [currentPage, setCurrentPage] = useState(0);
   const [activeTab, setActiveTab] = useState('statistics');
@@ -517,6 +559,20 @@ const ReportViewer = ({ report }) => {
   };
 
   const renderSection = (section) => {
+    // Special handling for AI Insights section
+    if (section.title === "AI Insights") {
+      return (
+        <div className={styles.section}>
+          <h2 className={styles.sectionTitle}>{section.title}</h2>
+          
+          <AIInsightsSection 
+            insights={section.insights} 
+            error={section.content?.error} 
+          />
+        </div>
+      );
+    }
+
     return (
       <div className={styles.section}>
         <h2 className={styles.sectionTitle}>{section.title}</h2>

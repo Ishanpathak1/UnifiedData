@@ -1709,3 +1709,28 @@
     width: 100%;
   }
 }
+
+.aiErrorContainer {
+  background-color: #FEF2F2;
+  padding: 1rem;
+  border-radius: 0.5rem;
+  border: 1px solid #FCA5A5;
+  margin: 1rem 0;
+}
+
+.aiError {
+  color: #B91C1C;
+}
+
+.errorHint {
+  font-size: 0.875rem;
+  margin-top: 0.5rem;
+}
+
+.emptyInsights {
+  background-color: #F9FAFB;
+  padding: 1rem;
+  border-radius: 0.5rem;
+  border: 1px solid #E5E7EB;
+  margin: 1rem 0;
+}
